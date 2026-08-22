@@ -21,4 +21,5 @@
 - **Collapsible strip mode** for a compact, always-visible readout, and a toolbar button (stock toolbar or Blizzy's, via ToolbarControl).
 - **Cyclable units** everywhere it makes sense: °C/K, kPa/atm, g/m·s², decimal/DMS coordinates, km/degrees for terminator distance.
 - **Adjustable panel scale** (Difficulty Settings), independent of the game's own UI Scale.
+- - **IVA monitor support** via [MFD Extension](https://github.com/Rjoande/MFD-Extension) (bay A): if both mods are installed, SA gets a screen on any compatible multi-function display prop, reachable without leaving the cockpit. Purely additive: nothing changes if MFD Extension isn't installed. It is just a compatibility framework for now: no actual feature added yet. 
 - **Localization**: English and Italian, full parity.
