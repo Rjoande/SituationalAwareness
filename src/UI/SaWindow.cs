@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using KSP.Localization;
 using SituationalAwareness.Core;
+using SituationalAwareness.Extensibility;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -90,6 +91,14 @@ namespace SituationalAwareness.UI
 		// visible) covers the vacuum/orbit case instead.
 		private GameObject extTempRowGo;
 		private GameObject pressureRowGo;
+		// Weather extension host (notes/indagine-meteo.md §8): a designated
+		// slot under the dial for external content — a survey companion's
+		// button row today, SA's own weather icon later. Bug fix (in-game
+		// test 2026-08-17): follows showAtmosphericRows exactly, same as
+		// EXT TEMP/PRESSURE — Surface/TidalLock AND the body has an
+		// atmosphere (weather/clouds are meaningless on an airless body),
+		// not just "not Orbit".
+		private GameObject weatherHostGo;
 		// Surface mode only, hidden when the body IS the star (stellar
 		// dive exception, retest 2026-07-28): "sun elevation/azimuth" is
 		// meaningless when the vessel is at/in the light source itself.
@@ -347,6 +356,21 @@ namespace SituationalAwareness.UI
 			// click handling — same ClickCatcher used by AddClickableRow,
 			// just attached directly to the dial's labels area instead.
 			SaUi.ClickCatcher(dial.labelsArea, CycleSolarTimeFormat);
+
+			// Weather extension host (notes/indagine-meteo.md §8): dialCol's
+			// dedicated lower section — the dial (built above) is the upper
+			// one. Bug fix (in-game test 2026-08-18): a plain SaUi.Go() has
+			// no ContentSizeFitter, so it never reported its populated
+			// children's real height back to dialCol's own VerticalLayoutGroup
+			// and just overlapped the dial above it. Own Vertical+ContentSizeFitter
+			// (same "hug my children" pattern as windowRect in Build()) makes
+			// it collapse to true zero height when empty (no companion
+			// subscribed) and size correctly once one populates it.
+			weatherHostGo = SaUi.Go("WeatherHost", dialCol.transform);
+			SaUi.Vertical(weatherHostGo, 0, 0f);
+			weatherHostGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+			SaExtensionPoint.Raise(weatherHostGo.transform);
+
 			BuildRows(dataCol.transform);
 			// Divider before the timeline (M3 restyling, mockup
 			// reconciliation) — previously the timeline ran straight into
@@ -739,6 +763,9 @@ namespace SituationalAwareness.UI
 			bool showAtmosphericRows = (r.Mode == SaMode.Surface || r.Mode == SaMode.TidalLock) && r.BodyHasAtmosphere;
 			if (extTempRowGo != null) extTempRowGo.SetActive(showAtmosphericRows);
 			if (pressureRowGo != null) pressureRowGo.SetActive(showAtmosphericRows);
+			// Weather extension host (bug fix 2026-08-17): same rule as
+			// above, not just "not Orbit" — no clouds without an atmosphere.
+			if (weatherHostGo != null) weatherHostGo.SetActive(showAtmosphericRows);
 			if (showAtmosphericRows)
 			{
 				SetTemperatureRow(r.ExternalTemperatureK);
