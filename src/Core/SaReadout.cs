@@ -128,6 +128,10 @@ namespace SituationalAwareness.Core
 
 		// Body / context
 		public string BodyName;
+		// CelestialBody.bodyName — the INTERNAL identifier ("Kerbin"), not the
+		// display name above. Config-driven per-body lookups key on this, since
+		// display names are localized and packs rename them freely.
+		public string BodyNameInternal;
 		public string StarName;
 		public double SolarDayLengthSec;
 		public bool BodyTidallyLocked;
@@ -194,5 +198,19 @@ namespace SituationalAwareness.Core
 		// (see SaReadoutProvider.BuildHullTemperature doc comment).
 		public double HullTempK;
 		public double HullTempWorstRatio;
+
+		// Weather (notes/indagine-meteo.md §3, tuned in notes/survey-analisi.md).
+		// State stays Unknown — and the row hides — without EVE volumetric
+		// clouds installed, or on a body with no atmosphere.
+		public SaWeatherReadout Weather;
+
+		// Science gate (SaScienceGate, go 2026-09-10): whether the panel may
+		// SHOW each gated readout on this body. The values above are always
+		// computed — the gate is presentation, so the survey companion and the
+		// extension point keep seeing real numbers regardless.
+		public bool ExtTempUnlocked;
+		public bool PressureUnlocked;
+		public bool GravityUnlocked;
+		public bool WeatherUnlocked;
 	}
 }

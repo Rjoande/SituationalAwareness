@@ -53,6 +53,28 @@ namespace SituationalAwareness.Core
 		public bool useBodyMapColorForDial;
 
 		/// <summary>
+		/// Science gate (go 2026-09-10): EXT TEMP, PRESSURE, live GRAVITY and
+		/// WEATHER stay "???" on a body until the matching experiment has
+		/// been credited there (SaScienceGate, ScienceGate.cfg). On by
+		/// default — the point is that the panel learns with the program —
+		/// with no effect in Sandbox, where there is no R&amp;D to ask.
+		/// </summary>
+		[GameParameters.CustomParameterUI("#LOC_SA_settings_scienceGate",
+			toolTip = "#LOC_SA_settings_scienceGate_tip")]
+		public bool gateOnScience = true;
+
+		/// <summary>
+		/// Weather report (go 2026-09-10): the opt-in diagnostic companion
+		/// (SaWeatherReport.dll, notes/indagine-meteo.md §8). Off by default;
+		/// the companion reads this and, the first time it is on with no
+		/// consent on record, shows its disclaimer in flight — declining
+		/// puts this back to off. SA itself does nothing with it.
+		/// </summary>
+		[GameParameters.CustomParameterUI("#LOC_SA_settings_weatherReport",
+			toolTip = "#LOC_SA_settings_weatherReport_tip")]
+		public bool enableWeatherReport;
+
+		/// <summary>
 		/// Window/font scale, on top of the stock UI Scale (retest
 		/// 2026-07-27: general readability complaint, "+50%, regolabile?").
 		/// Default reverted to 1.0 (further refinement, same day) — the
@@ -158,6 +180,32 @@ namespace SituationalAwareness.Core
 					return false;
 				}
 				return HighLogic.CurrentGame.Parameters.CustomParams<SaParams>().useFixedSurfaceGravity;
+			}
+		}
+
+		/// <summary>On by default: readouts stay hidden ("???") on a body until the matching experiment has been credited there. No effect in Sandbox.</summary>
+		public static bool GateOnScience
+		{
+			get
+			{
+				if (HighLogic.CurrentGame == null)
+				{
+					return true;
+				}
+				return HighLogic.CurrentGame.Parameters.CustomParams<SaParams>().gateOnScience;
+			}
+		}
+
+		/// <summary>Off by default: the weather-report companion may show its button (after consent). Read by SaWeatherReport.dll, not by SA.</summary>
+		public static bool EnableWeatherReport
+		{
+			get
+			{
+				if (HighLogic.CurrentGame == null)
+				{
+					return false;
+				}
+				return HighLogic.CurrentGame.Parameters.CustomParams<SaParams>().enableWeatherReport;
 			}
 		}
 

@@ -45,6 +45,7 @@ namespace SituationalAwareness.Core
 			// removes for us, so we strip it too (retest 2026-07-21: showed
 			// up as "KERBIN^N" in the UI).
 			r.BodyName = CleanDisplayName(body.displayName);
+			r.BodyNameInternal = body.bodyName;
 			r.BodyHasAtmosphere = body.atmosphere;
 			r.BodyIsStar = body.isStar;
 			// bodyName (internal identifier), not displayName — only the
@@ -78,6 +79,17 @@ namespace SituationalAwareness.Core
 			r.BodyChain = BuildBodyChain(body);
 			BuildGravity(ref r, vessel, body);
 			BuildHullTemperature(ref r, vessel);
+			// Self-throttled to ~1 Hz internally (sampling every cloud layer
+			// costs CPU texture reads) and a no-op without EVE installed.
+			r.Weather = WeatherClassifier.Classify(vessel, r.UT);
+
+			r.ExtTempUnlocked = SaScienceGate.IsUnlocked(SaScienceGate.FieldExtTemp, body);
+			r.PressureUnlocked = SaScienceGate.IsUnlocked(SaScienceGate.FieldPressure, body);
+			r.GravityUnlocked = SaScienceGate.IsUnlocked(SaScienceGate.FieldGravity, body);
+			// No atmosphere, no atmosphere analysis to run: a geyser plume on
+			// an airless moon (the only weather such a body can show) is not
+			// something a barometer could ever have told you about.
+			r.WeatherUnlocked = !body.atmosphere || SaScienceGate.IsUnlocked(SaScienceGate.FieldWeather, body);
 
 			r.IsHomeBody = body.isHomeWorld;
 

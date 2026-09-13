@@ -28,6 +28,12 @@ namespace SituationalAwareness
 
 		public void Start()
 		{
+			// Fresh flight scene: the weather classifier's caches are keyed on
+			// EVE layer objects that do not survive one, and dropping the flavor
+			// table picks up a ModuleManager reload made mid-session.
+			Core.WeatherClassifier.Reset();
+			Core.SaWeatherFlavor.Reset();
+			Core.SaScienceGate.Reset();
 			toolbarControl = gameObject.AddComponent<ToolbarControl>();
 			toolbarControl.AddToAllToolbars(
 				UI.SaWindow.Open, UI.SaWindow.CloseCurrent,

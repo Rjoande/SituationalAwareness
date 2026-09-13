@@ -91,6 +91,28 @@ namespace SituationalAwareness.UI
 		// visible) covers the vacuum/orbit case instead.
 		private GameObject extTempRowGo;
 		private GameObject pressureRowGo;
+		// WEATHER (notes/indagine-meteo.md §3) lives in the LEFT column under
+		// the dial, not among the data rows: it is a state to glance at, not a
+		// number to read, and the icon needs room the value column does not
+		// have. Needs both an atmosphere and EVE volumetric clouds installed,
+		// so it has its own visibility rule on top of showAtmosphericRows — an
+		// install without EVE sees no section at all, not an empty one.
+		private GameObject weatherSectionGo;
+		private Image weatherIcon;
+		private Text weatherLabel;
+		// Forecast line under the state (phase A, go 2026-09-10): secondary
+		// to the state on purpose — smaller, dimmer, lowercase, and separated
+		// from it by a blank line's worth of spacer. Both stay inactive when
+		// there is nothing to forecast, so the section keeps its height and
+		// stays centred in its half of the column.
+		private GameObject weatherForecastSpacerGo;
+		private Text weatherForecastLabel;
+		// The badge always has the text glyph; the image is only there when an
+		// alert texture is installed, and only ever draws the "!" — the "?" of
+		// a science-locked section is always the font's (see SetWeatherBadge).
+		private Image weatherBadgeImage;
+		private Text weatherBadgeText;
+		private string lastWeatherIconPath;
 		// Weather extension host (notes/indagine-meteo.md §8): a designated
 		// slot under the dial for external content — a survey companion's
 		// button row today, SA's own weather icon later. Bug fix (in-game
@@ -315,7 +337,11 @@ namespace SituationalAwareness.UI
 			// already shows through underneath (same fill color), only the
 			// border outline is gone.
 			GameObject dialCol = SaUi.Go("DialCol", body.transform);
-			SaUi.Size(dialCol, DialColWidth, -1f);
+			// flexibleHeight so the column fills the body row rather than
+			// hugging its own content: the two halves below can only share
+			// leftover space if there IS leftover space, and the row's height
+			// is set by the (much taller) data column next to it.
+			SaUi.Size(dialCol, DialColWidth, -1f).flexibleHeight = 1f;
 			// A little more breathing room between the dial graphic and the
 			// phase/sub labels below it (retest 2026-07-30, user request) —
 			// this VerticalLayoutGroup's spacing is the ONLY thing
@@ -350,7 +376,20 @@ namespace SituationalAwareness.UI
 			VerticalLayoutGroup dataColGroup = SaUi.Vertical(dataCol, 0, 6f);
 			dataColGroup.padding = new RectOffset(0, 0, 12, 12);
 
-			dial = SaDial.Build(dialCol.transform);
+			// Two equal halves, each centring its own content vertically (user
+			// request 2026-09-09): the dial above, weather below. Equal
+			// flexibleHeight splits whatever the data column leaves over, and
+			// MiddleCenter alignment keeps each block in the middle of its own
+			// half instead of both piling up at the top.
+			GameObject dialHalf = SaUi.Go("DialHalf", dialCol.transform);
+			SaUi.Vertical(dialHalf, 0, 8f).childAlignment = TextAnchor.MiddleCenter;
+			SaUi.Size(dialHalf, -1f, -1f).flexibleHeight = 1f;
+
+			GameObject weatherHalf = SaUi.Go("WeatherHalf", dialCol.transform);
+			SaUi.Vertical(weatherHalf, 0, 4f).childAlignment = TextAnchor.MiddleCenter;
+			SaUi.Size(weatherHalf, -1f, -1f).flexibleHeight = 1f;
+
+			dial = SaDial.Build(dialHalf.transform);
 			// SOLAR TIME's click-to-cycle (M3 point 6, go 2026-07-28): the
 			// dial's phase/sub area isn't a data row, so it has no built-in
 			// click handling — same ClickCatcher used by AddClickableRow,
@@ -366,7 +405,9 @@ namespace SituationalAwareness.UI
 			// (same "hug my children" pattern as windowRect in Build()) makes
 			// it collapse to true zero height when empty (no companion
 			// subscribed) and size correctly once one populates it.
-			weatherHostGo = SaUi.Go("WeatherHost", dialCol.transform);
+			BuildWeatherSection(weatherHalf.transform);
+
+			weatherHostGo = SaUi.Go("WeatherHost", weatherHalf.transform);
 			SaUi.Vertical(weatherHostGo, 0, 0f);
 			weatherHostGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 			SaExtensionPoint.Raise(weatherHostGo.transform);
@@ -428,6 +469,134 @@ namespace SituationalAwareness.UI
 			pressureRowGo = AddClickableRow(parent, "#LOC_SA_row_pressure", "pressure", CyclePressureUnit);
 			AddClickableRow(parent, "#LOC_SA_row_gravity", "gravity", CycleGravityUnit);
 		}
+
+		/// <summary>
+		/// The WEATHER section: dialCol's lower half, under the dial. A divider,
+		/// then a tinted icon with the state name beneath it, plus a small
+		/// top-right slot an external companion can drop a button into.
+		///
+		/// The whole thing collapses to nothing when there is no weather to
+		/// report (see ApplyExtended) so an airless body — or an install with no
+		/// EVE — loses the section entirely rather than showing a dead label.
+		/// </summary>
+		private void BuildWeatherSection(Transform parent)
+		{
+			// Cleared because the Image below is a NEW object every rebuild
+			// (collapse toggle, window re-open) while this field is not: left
+			// stale, the "same path as last time" shortcut in SetWeatherSection
+			// would skip assigning the sprite and the icon would silently
+			// vanish after the first toggle.
+			lastWeatherIconPath = null;
+
+			weatherSectionGo = SaUi.Go("WeatherSection", parent);
+			SaUi.Vertical(weatherSectionGo, 0, 3f);
+			weatherSectionGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+			// No divider and no "WEATHER" caption above the icon (user request,
+			// test 2026-09-11): the icon under the dial reads as weather on its
+			// own, and the line was one more edge in an already busy column.
+			// #LOC_SA_row_weather is kept in the loc files, commented out, in
+			// case the caption ever comes back.
+
+			// The icon needs a box of its OWN size, not a full-width row: the
+			// alert badge anchors to that box's bottom-left corner, and with
+			// the column-wide default it would sit against the panel edge
+			// instead of against the glyph.
+			GameObject iconRow = SaUi.Go("IconRow", weatherSectionGo.transform);
+			SaUi.Horizontal(iconRow, 0, 0f, TextAnchor.MiddleCenter);
+			SaUi.Size(iconRow, -1f, WeatherIconSize);
+
+			GameObject iconGo = SaUi.Go("Icon", iconRow.transform);
+			SaUi.Size(iconGo, WeatherIconSize, WeatherIconSize);
+			weatherIcon = iconGo.AddComponent<Image>();
+			weatherIcon.preserveAspect = true;
+			// Starts hidden: no state classified yet, and possibly no art
+			// installed at all.
+			weatherIcon.enabled = false;
+
+			BuildWeatherBadge(iconGo.transform);
+
+			weatherLabel = SaUi.Label(weatherSectionGo.transform, "-", 11, SaUi.Text, TextAnchor.MiddleCenter);
+			// A flavor name ("EXPLODIUM RAIN") is far longer than "RAIN" and the
+			// column is only 138px wide, so let it wrap rather than clip.
+			weatherLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+			SaUi.Size(weatherLabel.gameObject, DialColWidth - 12f, -1f);
+			ContentSizeFitter labelFitter = weatherLabel.gameObject.AddComponent<ContentSizeFitter>();
+			labelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+			// Forecast: a spacer standing in for the blank line the user asked
+			// for (a literal "\n" would make the label's own height lie to the
+			// layout), then the sentence itself, two points smaller and dim.
+			weatherForecastSpacerGo = SaUi.Go("ForecastSpacer", weatherSectionGo.transform);
+			SaUi.Size(weatherForecastSpacerGo, -1f, WeatherForecastSpacerHeight);
+			weatherForecastSpacerGo.SetActive(false);
+
+			weatherForecastLabel = SaUi.Label(weatherSectionGo.transform, "-", 9, SaUi.TextDim, TextAnchor.MiddleCenter);
+			weatherForecastLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+			SaUi.Size(weatherForecastLabel.gameObject, DialColWidth - 12f, -1f);
+			weatherForecastLabel.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+			weatherForecastLabel.gameObject.SetActive(false);
+
+			// Companion slot: anchored to the section's top-right corner and
+			// excluded from the layout group, so whatever an external DLL puts
+			// here floats over the section instead of pushing the icon down,
+			// and the companion can switch it on and off without moving
+			// anything. It spent one test (2026-09-11) in the footer, where
+			// it read as a stray brown square and shifted the footer text;
+			// the section now stays visible (as UNKNOWN) whenever the report
+			// is on, so the slot no longer needs to outlive it — see
+			// ApplyExtended.
+			GameObject corner = SaUi.Go("WeatherCorner", weatherSectionGo.transform);
+			corner.AddComponent<LayoutElement>().ignoreLayout = true;
+			RectTransform cornerRect = corner.GetComponent<RectTransform>();
+			cornerRect.anchorMin = new Vector2(1f, 1f);
+			cornerRect.anchorMax = new Vector2(1f, 1f);
+			cornerRect.pivot = new Vector2(1f, 1f);
+			cornerRect.anchoredPosition = new Vector2(-2f, -4f);
+			cornerRect.sizeDelta = new Vector2(WeatherCornerSize, WeatherCornerSize);
+			SaExtensionPoint.RaiseCorner(corner.transform);
+		}
+
+		/// <summary>
+		/// The severity mark in the icon's bottom-left corner. Prefers a
+		/// dedicated texture (SA_weather_alert) if one is installed — weather
+		/// apps use a rounder exclamation mark than a text font gives — and
+		/// falls back to a bold "!" from SA's own font when it is absent, so
+		/// the feature works before the art exists.
+		/// </summary>
+		private void BuildWeatherBadge(Transform iconTransform)
+		{
+			GameObject badge = SaUi.Go("AlertBadge", iconTransform);
+			badge.AddComponent<LayoutElement>().ignoreLayout = true;
+			RectTransform rect = badge.GetComponent<RectTransform>();
+			rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
+			rect.pivot = new Vector2(0f, 0f);
+			rect.anchoredPosition = new Vector2(-1f, -1f);
+			rect.sizeDelta = new Vector2(WeatherBadgeSize, WeatherBadgeSize);
+
+			Sprite sprite = SaWeatherIcons.Load(SaWeatherIcons.AlertPath);
+			if (sprite != null)
+			{
+				weatherBadgeImage = badge.AddComponent<Image>();
+				weatherBadgeImage.sprite = sprite;
+				weatherBadgeImage.preserveAspect = true;
+			}
+			// Plain bold glyph from SA's own font, no outline. Magnified it
+			// looks like it fights the icon's strokes, but at the real 32px
+			// it reads cleanly — chosen on the rendered comparison (user,
+			// 2026-09-09), not on the zoomed-in view. Always built: even with
+			// an alert texture installed, the "?" of a locked section is
+			// drawn from here.
+			weatherBadgeText = SaUi.Label(badge.transform, "!", 13, SaUi.Warn,
+				TextAnchor.MiddleCenter, FontStyle.Bold);
+			SaUi.Stretch(weatherBadgeText.rectTransform);
+			badge.SetActive(false);
+		}
+
+		private const float WeatherIconSize = 32f;
+		private const float WeatherForecastSpacerHeight = 6f;
+		private const float WeatherBadgeSize = 13f;
+		private const float WeatherCornerSize = 14f;
 
 		// Left/right padding every row applies to itself now that dataCol's
 		// own horizontal padding is zero (M3 restyling) — dividers (built
@@ -766,13 +935,50 @@ namespace SituationalAwareness.UI
 			// Weather extension host (bug fix 2026-08-17): same rule as
 			// above, not just "not Orbit" — no clouds without an atmosphere.
 			if (weatherHostGo != null) weatherHostGo.SetActive(showAtmosphericRows);
+			// WEATHER needs EVE on top of an atmosphere: Unknown means there is
+			// nothing to say, so the section goes away rather than showing a dash.
+			// Not tied to showAtmosphericRows any more (test 2026-09-11): an
+			// airless body can show weather too, but only from inside a plume
+			// — the classifier reports Unknown there for anything less, so
+			// the section still hides itself on every ordinary airless moon.
+			//
+			// Exception (user decision 2026-09-12): with the Weather Report
+			// switched on and its companion installed, Unknown is SHOWN, as
+			// the same dim cloud and UNKNOWN label the science gate uses —
+			// so the companion's ✎ button, which lives in this section's
+			// corner, is reachable on Mun or Vall too, where "SA shows
+			// nothing here" is exactly the report worth sending. SA reads
+			// only its own setting for this; consent is the companion's
+			// business (before it is given the companion keeps its button
+			// hidden, after a Decline the setting itself goes back off).
+			bool unknown = r.Weather.State == SaWeatherState.Unknown;
+			bool keepForReport = SaParams.EnableWeatherReport && SaExtensionPoint.HasCornerSubscriber;
+			bool showWeather = (r.Mode == SaMode.Surface || r.Mode == SaMode.TidalLock)
+				&& (!unknown || keepForReport);
+			if (weatherSectionGo != null) weatherSectionGo.SetActive(showWeather);
+			// Science gate (go 2026-09-10): a value not yet measured on this
+			// body shows "???" in dim text — the row stays, so the layout does
+			// not jump and the player can see there is something to unlock.
+			// "???" rather than the "—" used elsewhere: that dash means "no
+			// such value here", this means "there is one, you don't know it".
 			if (showAtmosphericRows)
 			{
-				SetTemperatureRow(r.ExternalTemperatureK);
-				SetRow("pressure", FormatPressure(r.PressureKPa));
+				if (r.ExtTempUnlocked) SetTemperatureRow(r.ExternalTemperatureK);
+				else SetRow("temperature", Loc("#LOC_SA_val_gated"), SaUi.TextDim);
+				if (r.PressureUnlocked) SetRow("pressure", FormatPressure(r.PressureKPa), SaUi.Text);
+				else SetRow("pressure", Loc("#LOC_SA_val_gated"), SaUi.TextDim);
+			}
+			if (showWeather)
+			{
+				// Unknown-for-the-report has no "?": that mark means "there is
+				// a reading, go and earn it", and on an airless moon there is
+				// none to earn. It gets an "X" instead (user, 2026-09-12).
+				if (unknown) SetWeatherLocked(LockedBadge.NoReading);
+				else if (r.WeatherUnlocked) SetWeatherSection(r.Weather, r.BodyNameInternal, r.SunElevationDeg, r.UT);
+				else SetWeatherLocked(LockedBadge.Gated);
 			}
 			SetHullTemperatureRow(r.HullTempK, r.HullTempWorstRatio);
-			SetRow("gravity", FormatGravity(r));
+			SetRow("gravity", FormatGravity(r, out Color gravityColor), gravityColor);
 			if (r.Mode == SaMode.TidalLock)
 			{
 				// Cyan (M3 restyling, mockup D reconciliation).
@@ -1399,6 +1605,240 @@ namespace SituationalAwareness.UI
 			SetRow("hullTemp", text, c);
 		}
 
+		/// <summary>
+		/// Paints the weather section. Colour carries the same meaning as
+		/// everywhere else in the panel: dim text for "nothing going on", plain
+		/// text for cloud, cyan for anything falling, danger red for the one
+		/// condition that can actually hurt a vessel on the ground.
+		///
+		/// Body name and sun elevation come in because both can change the
+		/// presentation without the state itself changing — a flavor entry
+		/// renames per body, and Clear/Cloudy have optional night icons.
+		/// </summary>
+		private void SetWeatherSection(SaWeatherReadout weather, string bodyName, double sunElevationDeg, double ut)
+		{
+			SaWeatherState state = weather.State;
+			string key;
+			switch (state)
+			{
+				case SaWeatherState.Cloudy: key = "#LOC_SA_weather_cloudy"; break;
+				case SaWeatherState.Fog: key = "#LOC_SA_weather_fog"; break;
+				case SaWeatherState.Rain: key = "#LOC_SA_weather_rain"; break;
+				case SaWeatherState.Snow: key = "#LOC_SA_weather_snow"; break;
+				case SaWeatherState.Thunderstorm: key = "#LOC_SA_weather_thunderstorm"; break;
+				case SaWeatherState.DustStorm: key = "#LOC_SA_weather_dustStorm"; break;
+				default: key = "#LOC_SA_weather_clear"; break;
+			}
+
+			// One neutral colour for every state (user request 2026-09-09):
+			// severity moved out of the glyph's tint and into the corner badge,
+			// so the icons read as one family and the mark is the only thing
+			// competing for attention when there IS something to flag.
+			Color c = SaUi.Text;
+
+			// Flavor can override both the name and the icon, never the state
+			// (see SaWeatherFlavor) — so a body whose rain is not water can say
+			// so and carry its own hazard-marked icon.
+			// The generic loc KEY goes in as the fallback, not its translation:
+			// Loc() below resolves whichever wins, and Localizer.Format returns
+			// a non-key string unchanged, so a flavor entry may supply either a
+			// #LOC_ key or a literal.
+			bool isNight = sunElevationDeg < 0.0;
+			SaWeatherFlavor.Resolve(bodyName, state, isNight, key,
+				SaWeatherIcons.PathFor(state, isNight),
+				out string name, out string iconPath);
+
+			if (weatherLabel != null)
+			{
+				weatherLabel.text = Loc(name);
+				weatherLabel.color = c;
+			}
+
+			// Sprite lookup only when the path actually changed: Load() caches,
+			// but this runs at the panel's refresh rate and the common case is
+			// "same weather as last tick".
+			if (weatherIcon != null && iconPath != lastWeatherIconPath)
+			{
+				lastWeatherIconPath = iconPath;
+				Sprite sprite = SaWeatherIcons.Load(iconPath);
+				weatherIcon.sprite = sprite;
+				weatherIcon.enabled = sprite != null;
+			}
+			if (weatherIcon != null) weatherIcon.color = c;
+
+			switch (SaWeatherStates.SeverityOf(state))
+			{
+				case SaWeatherSeverity.Warning: SetWeatherBadge("!", SaUi.Danger); break;
+				case SaWeatherSeverity.Caution: SetWeatherBadge("!", SaUi.Warn); break;
+				default: SetWeatherBadge(null, SaUi.Warn); break;
+			}
+			SetWeatherForecast(weather.Forecast, ut);
+		}
+
+		/// <summary>Which mark sits on the locked cloud, see SetWeatherLocked.</summary>
+		private enum LockedBadge
+		{
+			/// <summary>Science gate: cyan "?" — there is a reading, go and earn it.</summary>
+			Gated,
+			/// <summary>Nothing to read here at all: amber "X", the colour of the
+			/// companion's ✎ next to it, since the section is only on screen
+			/// for the report's sake.</summary>
+			NoReading
+		}
+
+		/// <summary>
+		/// The science gate's version of the section (go 2026-09-10): the
+		/// plain locked cloud in the dim text grey under UNKNOWN — the one
+		/// weather label that is uppercase — with a "?" in the badge corner.
+		/// Also the face of a genuinely unknown sky kept visible for the
+		/// Weather Report (2026-09-12), then with an "X" instead. No forecast
+		/// either way: a sky you cannot read has no tomorrow.
+		/// </summary>
+		private void SetWeatherLocked(LockedBadge badge)
+		{
+			if (weatherLabel != null)
+			{
+				weatherLabel.text = Loc("#LOC_SA_weather_locked");
+				weatherLabel.color = SaUi.TextDim;
+			}
+			string iconPath = SaWeatherIcons.LockedPath;
+			if (weatherIcon != null && iconPath != lastWeatherIconPath)
+			{
+				lastWeatherIconPath = iconPath;
+				Sprite sprite = SaWeatherIcons.Load(iconPath);
+				weatherIcon.sprite = sprite;
+				weatherIcon.enabled = sprite != null;
+			}
+			if (weatherIcon != null) weatherIcon.color = SaUi.TextDim;
+			// Cyan, not the icon's own dim grey (user, test 2026-09-11): the
+			// mark has to stand out from the cloud it sits on, and cyan is the
+			// panel's "information" colour — not an alert like amber or red.
+			// The "X" is amber on purpose: same ffb000 as the companion's ✎
+			// (ReportUi duplicates SaUi's palette), so the two read as one
+			// thing — "no weather here, but you can still report that".
+			if (badge == LockedBadge.Gated) SetWeatherBadge("?", SaUi.Cyan);
+			else SetWeatherBadge("X", SaUi.Amber);
+			SetWeatherForecast(default(SaWeatherForecast), 0.0);
+		}
+
+		/// <summary>
+		/// The corner badge: hidden for a null glyph. "!" prefers the alert
+		/// texture when one is installed; any other glyph (the locked "?") is
+		/// always the font's, since a texture only knows how to be a "!".
+		/// </summary>
+		private void SetWeatherBadge(string glyph, Color color)
+		{
+			if (weatherBadgeText == null) return;
+			GameObject badge = weatherBadgeText.transform.parent.gameObject;
+			if (glyph == null)
+			{
+				badge.SetActive(false);
+				return;
+			}
+			badge.SetActive(true);
+			bool useImage = weatherBadgeImage != null && glyph == "!";
+			if (weatherBadgeImage != null)
+			{
+				weatherBadgeImage.enabled = useImage;
+				weatherBadgeImage.color = color;
+			}
+			weatherBadgeText.enabled = !useImage;
+			weatherBadgeText.text = glyph;
+			weatherBadgeText.color = color;
+		}
+
+		/// <summary>
+		/// The forecast sentence (WeatherForecaster): lowercase, dim, two
+		/// points smaller than the state, after a blank line. Hidden — spacer
+		/// included — when there is nothing to say, so an unforecastable body
+		/// looks exactly as it did before the feature existed.
+		/// </summary>
+		private void SetWeatherForecast(SaWeatherForecast forecast, double ut)
+		{
+			if (weatherForecastLabel == null || weatherForecastSpacerGo == null) return;
+			bool show = forecast.Kind != SaForecastKind.None;
+			weatherForecastSpacerGo.SetActive(show);
+			weatherForecastLabel.gameObject.SetActive(show);
+			if (!show) return;
+
+			string when = FormatForecastDuration(forecast.Seconds);
+			string text;
+			switch (forecast.Kind)
+			{
+				case SaForecastKind.Ends:
+					text = Localizer.Format("#LOC_SA_forecast_ends", ForecastStateName(forecast.State), when);
+					break;
+				case SaForecastKind.Risk:
+					text = Localizer.Format("#LOC_SA_forecast_risk", ForecastStateName(forecast.State), when);
+					break;
+				case SaForecastKind.Possible:
+					text = Localizer.Format("#LOC_SA_forecast_possible", ForecastStateName(forecast.State), when);
+					break;
+				case SaForecastKind.Changeable:
+					// Three wordings for the same fact (user request: less
+					// monotonous), rotated per weather window, not per tick:
+					// the seed is the UT of the next transition, constant
+					// until the front actually changes.
+					long seed = (long)((ut + forecast.Seconds) / 60.0);
+					int variant = (int)(seed % ChangeableWordings) + 1;
+					text = Loc("#LOC_SA_forecast_changeable_" + variant);
+					break;
+				default:
+					// The horizon is a round number of days: "3d+", never
+					// "3d 0h+" (test 2026-09-11).
+					text = Localizer.Format("#LOC_SA_forecast_stable", FormatForecastDuration(forecast.Seconds, 1));
+					break;
+			}
+			weatherForecastLabel.text = text;
+		}
+
+		private const int ChangeableWordings = 3;
+
+		/// <summary>
+		/// Short, lowercase state names for the forecast sentence — their own
+		/// keys, not the state label's: "tempesta di sabbia" does not fit a
+		/// 9px line with a time after it, "temp. sabbia" does. Never the
+		/// flavor name either, for the same reason.
+		/// </summary>
+		private static string ForecastStateName(SaWeatherState state)
+		{
+			switch (state)
+			{
+				case SaWeatherState.Rain: return Loc("#LOC_SA_forecast_rain");
+				case SaWeatherState.Snow: return Loc("#LOC_SA_forecast_snow");
+				case SaWeatherState.Thunderstorm: return Loc("#LOC_SA_forecast_thunderstorm");
+				case SaWeatherState.DustStorm: return Loc("#LOC_SA_forecast_dustStorm");
+				default: return Loc("#LOC_SA_weather_clear");
+			}
+		}
+
+		/// <summary>
+		/// Forecast times use the same global-calendar formatter as every
+		/// other countdown in the panel (sunrise, eclipse, SoI change), capped
+		/// at two terms and never showing seconds — weather is not accurate
+		/// to the second, and the sentence has to fit a narrow line. Under a
+		/// minute reads "&lt;1m" rather than a pointless "0m".
+		/// </summary>
+		private static string FormatForecastDuration(double seconds, int maxTerms = 2)
+		{
+			if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds > 1e12) return Loc("#LOC_SA_val_infinite");
+			seconds = Math.Max(0.0, seconds);
+			IDateTimeFormatter fmt = KSPUtil.dateTimeFormatter;
+			if (fmt == null || fmt.Minute <= 0 || fmt.Hour <= 0 || fmt.Day <= 0 || fmt.Year <= 0)
+				return F(seconds, "0") + " s";
+			if (seconds < fmt.Minute) return "<1" + TimeUnitMinute;
+
+			long total = (long)seconds;
+			long y = total / fmt.Year;
+			long remY = total % fmt.Year;
+			long d = remY / fmt.Day;
+			long remD = remY % fmt.Day;
+			long h = remD / fmt.Hour;
+			long m = (remD % fmt.Hour) / fmt.Minute;
+			return JoinDurationTerms(new[] { y, d, h, m },
+				new[] { TimeUnitYear, TimeUnitDay, TimeUnitHour, TimeUnitMinute }, maxTerms);
+		}
+
 		private static string FormatPressure(double kPa)
 		{
 			if (kPa <= 1e-6) return Loc("#LOC_SA_val_vacuum");
@@ -1426,9 +1866,18 @@ namespace SituationalAwareness.UI
 		/// (design doc feedback 2026-07-19); settings toggle switches to
 		/// the fixed ASL value.
 		/// </summary>
-		private static string FormatGravity(SaReadout r)
+		private static string FormatGravity(SaReadout r, out Color color)
 		{
+			color = SaUi.Text;
 			bool useFixed = SaParams.UseFixedSurfaceGravity;
+			// Science gate (go 2026-09-10): only the LIVE reading is gated —
+			// the body's ASL reference is a known constant and stays visible,
+			// dimmed to say it is the reference, not a measurement.
+			if (!useFixed && !r.GravityUnlocked)
+			{
+				useFixed = true;
+				color = SaUi.TextDim;
+			}
 			if (!useFixed && !r.GravityLiveValid)
 			{
 				return Loc("#LOC_SA_val_outOfRange");

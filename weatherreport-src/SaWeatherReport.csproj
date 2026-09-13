@@ -4,8 +4,8 @@
     <!-- KSP 1.12.5 runs Unity 2019.4 / Mono: target .NET Framework 4.7.2 -->
     <TargetFramework>net472</TargetFramework>
     <LangVersion>8.0</LangVersion>
-    <AssemblyName>SituationalAwareness</AssemblyName>
-    <RootNamespace>SituationalAwareness</RootNamespace>
+    <AssemblyName>SaWeatherReport</AssemblyName>
+    <RootNamespace>SituationalAwareness.WeatherReport</RootNamespace>
     <Version>0.2.0</Version>
     <DebugType>none</DebugType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -45,17 +45,18 @@
       <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="ToolbarControl">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\GameData\001_ToolbarControl\Plugins\ToolbarControl.dll</HintPath>
+    <!-- SA's own extension point (SaExtensionPoint) — the only public
+         surface this companion touches, not copied into our own Plugins/
+         folder (already present in SA's, would just be a stale duplicate). -->
+    <Reference Include="SituationalAwareness">
+      <HintPath>$(MSBuildProjectDirectory)\..\GameData\SituationalAwareness\Plugins\SituationalAwareness.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- EVE volumetric clouds: SOFT dependency for the WEATHER row. Every type
-         from these two lives inside EveWeatherReader alone, which is only ever
-         entered after WeatherClassifier.Available confirms both assemblies are
-         loaded — so on an install without EVE the reference is never resolved
-         and nothing throws (same pattern already proven in game by the survey
-         companion, notes/indagine-meteo.md §6). Private=false: never copied
-         into the release. -->
+    <!-- EVE Volumetrics: compile-time reference (same pattern as
+         ToolbarControl elsewhere), guarded at runtime by an
+         AssemblyLoader.loadedAssemblies check before touching these types
+         (notes/indagine-meteo.md §6) — players without EVE installed must
+         never hit a missing-assembly crash. -->
     <Reference Include="Atmosphere">
       <HintPath>$(MSBuildProjectDirectory)\..\..\..\GameData\EnvironmentalVisualEnhancements\Plugins\Atmosphere.dll</HintPath>
       <Private>false</Private>
@@ -66,10 +67,10 @@
     </Reference>
   </ItemGroup>
 
-  <!-- Deploy the plugin DLL into the mod folder KSP actually loads. Path
-       updated for the double-root reorg (publication prep): the installable
-       mod now lives at GameData/SituationalAwareness/GameData/SituationalAwareness/,
-       matching the layout of GameData/KRAB, GameData/KRILL, GameData/TimeForScience. -->
+  <!-- Deploy into SA's own installed mod folder, next to
+       SituationalAwareness.dll — deliberate choice (2026-08-17): one
+       GameData folder for the player to manage, uninstalling the
+       companion is just deleting this one DLL. -->
   <Target Name="DeployToGameData" AfterTargets="Build">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(MSBuildProjectDirectory)\..\GameData\SituationalAwareness\Plugins\" />
   </Target>
