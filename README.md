@@ -62,7 +62,7 @@ GameData/SituationalAwareness/PluginData/WeatherReport/
 
 **How to send them**
 
-Upload both files here — no account needed:
+Upload both files here (no account needed):
 
 **https://www.dropbox.com/request/9khup21i0c1xm1bk4w8o**
 
