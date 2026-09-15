@@ -37,6 +37,16 @@ namespace SituationalAwareness.WeatherReport
 		private Text verdictLabel;
 		private float nextVerdictRefresh;
 
+		/// <summary>
+		/// Held for as long as the note field has keyboard focus (fix
+		/// 2026-09-14, user: typing a note fired flight commands). The hover
+		/// lock in ReportWindowDrag sits on the header only, and the pointer
+		/// is rarely on the header while typing — focus, not hover, is what
+		/// decides where keystrokes go.
+		/// </summary>
+		private const string TypingLockId = "SA_WeatherReport_typing";
+		private bool typingLocked;
+
 		internal static WeatherReportWindow Create()
 		{
 			GameObject host = new GameObject("SaWeatherReportWindow");
@@ -68,6 +78,22 @@ namespace SituationalAwareness.WeatherReport
 		{
 			GameEvents.onHideUI.Remove(OnHideUI);
 			GameEvents.onShowUI.Remove(OnShowUI);
+			SetTypingLock(false);
+		}
+
+		private void OnDisable()
+		{
+			// Hide() deactivates the object, which stops Update: drop the lock
+			// here or a note left with focus would wedge the controls.
+			SetTypingLock(false);
+		}
+
+		private void SetTypingLock(bool locked)
+		{
+			if (locked == typingLocked) return;
+			typingLocked = locked;
+			if (locked) InputLockManager.SetControlLock(ControlTypes.All, TypingLockId);
+			else InputLockManager.RemoveControlLock(TypingLockId);
 		}
 
 		private void OnHideUI() => canvas.enabled = false;
@@ -158,6 +184,7 @@ namespace SituationalAwareness.WeatherReport
 		private void Update()
 		{
 			scaler.scaleFactor = GameSettings.UI_SCALE;
+			SetTypingLock(noteField != null && noteField.isFocused);
 			// Once a second is plenty — SA's own classifier is throttled to the
 			// same rate, so polling faster would just re-read a cached value.
 			if (Time.unscaledTime < nextVerdictRefresh) return;
@@ -185,7 +212,19 @@ namespace SituationalAwareness.WeatherReport
 		private void OnLabelPressed(string label)
 		{
 			WeatherSample sample = WeatherProbe.Sample(FlightGlobals.ActiveVessel);
-			WeatherReportCsvWriter.Write(label, noteField != null ? noteField.text : "", sample);
+			bool written = WeatherReportCsvWriter.Write(label, noteField != null ? noteField.text : "", sample);
+			// Immediate on-screen confirmation (user request 2026-09-14): the
+			// button itself gives no sign that anything happened. Stock
+			// ScreenMessages, upper centre, same place the game's own
+			// "quicksave" and warp notices go.
+			if (written)
+			{
+				ScreenMessages.PostScreenMessage("Weather Report: " + label.ToUpperInvariant() + " recorded", 2.5f, ScreenMessageStyle.UPPER_CENTER);
+			}
+			else
+			{
+				ScreenMessages.PostScreenMessage("<color=#ff6060>Weather Report: sample NOT recorded, see KSP.log</color>", 4f, ScreenMessageStyle.UPPER_CENTER);
+			}
 		}
 
 		internal void Toggle()

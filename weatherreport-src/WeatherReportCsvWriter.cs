@@ -43,9 +43,16 @@ namespace SituationalAwareness.WeatherReport
 		// UTF-8 either way, so the BOM costs nothing.
 		private static readonly Encoding Utf8WithBom = new UTF8Encoding(true);
 
-		internal static void Write(string label, string note, WeatherSample sample)
+		/// <summary>
+		/// Appends one press (plus one row per layer) to the CSV. Returns
+		/// true only once the bytes are on disk, so the caller can confirm
+		/// on screen (user request 2026-09-14); an I/O failure is logged and
+		/// reported as false instead of escaping into the button callback,
+		/// where Unity would swallow it with no feedback at all.
+		/// </summary>
+		internal static bool Write(string label, string note, WeatherSample sample)
 		{
-			if (sample == null) return;
+			if (sample == null) return false;
 
 			string filePath = ResolveFilePath();
 			bool isNewFile = !File.Exists(filePath);
@@ -90,9 +97,18 @@ namespace SituationalAwareness.WeatherReport
 				)).Append('\n');
 			}
 
-			File.AppendAllText(filePath, sb.ToString(), Utf8WithBom);
+			try
+			{
+				File.AppendAllText(filePath, sb.ToString(), Utf8WithBom);
+			}
+			catch (Exception e)
+			{
+				Debug.LogWarning("[SA_WeatherReport] could not write " + filePath + ": " + e.Message);
+				return false;
+			}
 			Debug.Log("[SA_WeatherReport] press " + pressId + " label=" + label + " layers=" + sample.Layers.Count);
 			WriteInstalledModsOnce();
+			return true;
 		}
 
 		private static bool modsWritten;

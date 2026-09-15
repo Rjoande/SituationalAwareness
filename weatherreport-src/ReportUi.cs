@@ -114,8 +114,10 @@ namespace SituationalAwareness.WeatherReport
 
 	/// <summary>
 	/// Drag-to-move for the report window, and the KSP input lock while the
-	/// pointer is over it — without the lock, typing a note fires staging,
-	/// SAS and every other single-key game binding underneath.
+	/// pointer is over the header it is attached to. Typing is covered
+	/// separately: WeatherReportWindow holds its own lock while the note
+	/// field has focus (2026-09-14), since the pointer is anywhere but the
+	/// header at that moment.
 	/// </summary>
 	internal class ReportWindowDrag : MonoBehaviour, IDragHandler, IPointerEnterHandler, IPointerExitHandler
 	{

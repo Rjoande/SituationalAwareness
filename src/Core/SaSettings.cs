@@ -84,6 +84,13 @@ namespace SituationalAwareness.Core
 		/// CustomFloatParameterUI usage elsewhere in stock GameParameters.cs,
 		/// e.g. the physics-range sliders: stepCount + minValue/maxValue +
 		/// displayFormat).
+		///
+		/// Global, not per save, since 2026-09-14 (user: the scale did not
+		/// survive a change of save, and it should): this slider is only the
+		/// CONTROL, the value itself lives in SaPersist (settings.cfg) and
+		/// SaUiScaleSync copies it into every loaded game and back out when
+		/// the player moves it. A GameParameters field is still the only way
+		/// to get a slider into the stock settings dialog.
 		/// </summary>
 		[GameParameters.CustomFloatParameterUI("#LOC_SA_settings_uiScale",
 			toolTip = "#LOC_SA_settings_uiScale_tip",
@@ -222,16 +229,18 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>SA's own window/font scale multiplier, stacked on top of GameSettings.UI_SCALE (retest 2026-07-27). Defaults to 1.0 even before a game is loaded, matching the field default.</summary>
+		/// <summary>
+		/// SA's own window/font scale multiplier, stacked on top of
+		/// GameSettings.UI_SCALE (retest 2026-07-27). Global since 2026-09-14:
+		/// read from SaPersist, never from the current game — the per-save
+		/// slider is only its control (see SaUiScaleSync).
+		/// </summary>
 		public static float UiScale
 		{
 			get
 			{
-				if (HighLogic.CurrentGame == null)
-				{
-					return 1.0f;
-				}
-				return HighLogic.CurrentGame.Parameters.CustomParams<SaParams>().uiScale;
+				SaPersist.EnsureLoaded();
+				return SaPersist.UiScale;
 			}
 		}
 
@@ -251,7 +260,8 @@ namespace SituationalAwareness.Core
 
 	/// <summary>
 	/// Player-global, per-save-independent state: unit choices, window
-	/// position, collapsed strip state (design doc §6.4/§6.7). PluginData/,
+	/// position, collapsed strip state (design doc §6.4/§6.7), panel scale
+	/// (2026-09-14). PluginData/,
 	/// not GameData/ (ModuleManager never scans it — same convention as
 	/// KRILL's keymap, no MM cache rebuild on save).
 	/// </summary>
@@ -271,6 +281,8 @@ namespace SituationalAwareness.Core
 		public static SaCoordUnit CoordUnit = SaCoordUnit.Decimal;
 		public static SaSolarTimeFormat SolarTimeFormat = SaSolarTimeFormat.Clock;
 		public static bool Collapsed;
+		/// <summary>Panel scale, the value behind the SaParams.uiScale slider. Same range as the slider.</summary>
+		public static float UiScale = 1.0f;
 		public static bool HasWindowPosition;
 		public static Vector2 WindowPosition;
 
@@ -306,6 +318,9 @@ namespace SituationalAwareness.Core
 			bool collapsed = false;
 			if (node.TryGetValue("collapsed", ref collapsed)) Collapsed = collapsed;
 
+			float scale = 0f;
+			if (node.TryGetValue("uiScale", ref scale) && scale > 0f) UiScale = Mathf.Clamp(scale, 0.5f, 2f);
+
 			float px = 0f, py = 0f;
 			bool hasX = node.TryGetValue("windowX", ref px);
 			bool hasY = node.TryGetValue("windowY", ref py);
@@ -327,6 +342,7 @@ namespace SituationalAwareness.Core
 			node.AddValue("coordUnit", CoordUnit.ToString());
 			node.AddValue("solarTimeFormat", SolarTimeFormat.ToString());
 			node.AddValue("collapsed", Collapsed);
+			node.AddValue("uiScale", UiScale);
 			if (HasWindowPosition)
 			{
 				node.AddValue("windowX", WindowPosition.x);
