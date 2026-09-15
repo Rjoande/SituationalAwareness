@@ -1,12 +1,23 @@
 # Changelog
 
+## [0.2.1]
+
+### Added
+
+- Weather Report: a short on-screen message confirms every press ("Weather Report: \<TYPE\> recorded"), or says so if the sample could not be written.
+
+### Fixed
+
+- Weather Report: typing in the note field no longer reaches the game (staging, SAS, brakes and the rest are locked while the field has keyboard focus).
+- The panel scale set in Difficulty Settings is now global: one value shared by every save, instead of a per-save setting that came up at 1.0 again in each new game. The slider stays where it was; the value is stored in `PluginData/settings.cfg` next to the unit choices and window position.
+
 ## [0.2.0]
 
 ### Added
 
-- **Weather**: a WEATHER row reading the actual state of the sky (clear, cloudy, fog, rain, snow, thunderstorm, dust storm) from [EVE](https://github.com/LGhassen/EnvironmentalVisualEnhancements) + **Volumetric Clouds** when installed. Classified on functional properties (optical depth, EVE's own particle-render gate, particle fall speed and count, lightning configuration), never on layer names, so it works with any volumetrics pack rather than only the ones it was written against. Purely additive: no EVE, no row.
+- **Weather**: a WEATHER row reading the actual state of the sky (clear, cloudy, fog, rain, snow, thunderstorm, dust storm) from [EVE Volumetrics](https://github.com/LGhassen/EnvironmentalVisualEnhancements) when installed. Classified on functional properties (optical depth, EVE's own particle-render gate, particle fall speed and count, lightning configuration), never on layer names, so it works with any volumetrics pack rather than only the ones it was written against. Purely additive: no EVE, no row.
 - Per-body weather names and icons (`WeatherFlavor.cfg`): Eve's rain is EXPLODIUM RAIN with its own icon, Vall's geyser mist is GEYSER, and the night-sky Clear/Cloudy icons show the moons a body actually has (none, one, several, or a gas giant filling the sky); inside a gas giant's electrified deck (Jool, Lindor, Sirona) the state reads CONVECTIVE STORM.
-- **Weather forecast line** under the weather state, from the cloud layers' own on/off clocks: "rain ends within 1h 20m", "dust storm risk in 1d 4h", "dust storm possible for 1d 4h", "stable for 3d+", or just "changeable". Only what the clock can back: WHEN a weather system switches is exact, WHETHER its clouds land on you is not, hence "risk" and "possible". Where a system is always on (Kerbin) nothing can be timed and the line says "changeable" rather than guessing. Bodies whose weather never switches (Jool) show no line at all. A phase B that samples the cloud maps along their drift, to time things on Kerbin too, is planned. **Note on timing**: EVE's weather cycles are anchored to the save's universal time (UT 0), not to local time, the body's day or the calendar — they are identical in every save, and time warp advances them like everything else. Forecast times use the same calendar units as the panel's other countdowns.
+- **Weather forecast line** under the weather state, from the cloud layers' own on/off clocks: "rain ends within 1h 20m", "dust storm risk in 1d 4h", "dust storm possible for 1d 4h", "stable for 3d+", or just "changeable". Only what the clock can back: WHEN a weather system switches is exact, WHETHER its clouds land on you is not, hence "risk" and "possible". Where a system is always on (Kerbin) nothing can be timed and the line says "changeable" rather than guessing. Bodies whose weather never switches (Jool) show no line at all. A phase B that samples the cloud maps along their drift, to time things on Kerbin too, is planned. **Note on timing**: EVE's weather cycles are anchored to the save's universal time (UT 0), not to local time, the body's day or the calendar. They are identical in every save, and time warp advances them like everything else. Forecast times use the same calendar units as the panel's other countdowns.
 - **Weather Report** (optional, off by default): a small diagnostic companion for when SA's weather does not match what you see. Switch it on in Difficulty Settings, accept the disclaimer shown in flight, and a pencil button appears in the corner of the weather section (which then stays visible, as UNKNOWN, even where SA has no weather to show): press the label that matches the sky and one sample (EVE's raw layer values, SA's own call, position and time) is written to a local CSV, plus a one-per-session list of loaded plugins. Nothing is ever sent automatically; how to share the files is described in the README. Declining the disclaimer switches the option back off.
 - **Science gate** (Science/Career only, on by default, switchable in Difficulty Settings): EXT TEMP, PRESSURE, live GRAVITY and WEATHER read "???" / UNKNOWN on a body until the matching experiment has been *credited* there — thermometer, barometer, gravimeter, atmosphere analysis (or BDB's orbital weather observation) — any situation, any biome. The ASL gravity reference stays visible. Config-driven (`ScienceGate.cfg`, ModuleManager-patchable), so other instruments can open a readout without touching SA.
 
