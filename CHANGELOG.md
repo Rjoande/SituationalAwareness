@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.2] — 2026-09-17
+## v0.2.2
 
 ### Added
 
@@ -11,7 +11,7 @@
 - Improved the `SA_weather_cloudy_night_bare` icon (art only, no code change).
 - The extended panel's weather widget no longer shows a "?" badge when the science gate has not credited an atmosphere-analysis experiment yet: the padlock now drawn into the locked-state icon says it by itself.
 
-## [0.2.1]
+## v0.2.1
 
 ### Added
 
@@ -22,7 +22,7 @@
 - Weather Report: typing in the note field no longer reaches the game (staging, SAS, brakes and the rest are locked while the field has keyboard focus).
 - The panel scale set in Difficulty Settings is now global: one value shared by every save, instead of a per-save setting that came up at 1.0 again in each new game. The slider stays where it was; the value is stored in `PluginData/settings.cfg` next to the unit choices and window position.
 
-## [0.2.0]
+## v0.2.0
 
 ### Added
 
@@ -32,7 +32,7 @@
 - **Weather Report** (optional, off by default): a small diagnostic companion for when SA's weather does not match what you see. Switch it on in Difficulty Settings, accept the disclaimer shown in flight, and a pencil button appears in the corner of the weather section (which then stays visible, as UNKNOWN, even where SA has no weather to show): press the label that matches the sky and one sample (EVE's raw layer values, SA's own call, position and time) is written to a local CSV, plus a one-per-session list of loaded plugins. Nothing is ever sent automatically; how to share the files is described in the README. Declining the disclaimer switches the option back off.
 - **Science gate** (Science/Career only, on by default, switchable in Difficulty Settings): EXT TEMP, PRESSURE, live GRAVITY and WEATHER read "???" / UNKNOWN on a body until the matching experiment has been *credited* there — thermometer, barometer, gravimeter, atmosphere analysis (or BDB's orbital weather observation) — any situation, any biome. The ASL gravity reference stays visible. Config-driven (`ScienceGate.cfg`, ModuleManager-patchable), so other instruments can open a readout without touching SA.
 
-## [0.1.0]
+## v0.1.0
 
 ### Added
 
