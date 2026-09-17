@@ -4,12 +4,12 @@
 
 ### Added
 
-- The collapsed strip now shows the weather icon and external temperature too (previously extended-panel-only), right before the "next event" text: same neutral grey the extended widget uses, no name label, no severity badge. Follows the exact same show/hide/science-gate rule as the extended widget (`SaWeatherVisibility`), so the two views never disagree about when there is something to show. Gated fields show the same locked look, no separate "?" mark.
+- The collapsed strip now shows the weather icon and external temperature too. Follows the exact same show/hide/science-gate rule as the extended widget.
 
 ### Changed
 
-- Improved the `SA_weather_cloudy_night_bare` icon (art only, no code change).
-- The extended panel's weather widget no longer shows a "?" badge when the science gate has not credited an atmosphere-analysis experiment yet: the padlock now drawn into the locked-state icon says it by itself.
+- Improved the `SA_weather_cloudy_night_bare` icon art.
+- The extended panel's weather widget no longer shows a "?" badge when the science gate has not credited.
 
 ## v0.2.1
 

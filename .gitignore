@@ -8,6 +8,9 @@ weatherreport-src/obj/
 weatherreport-src/bin/
 weatherreport-src/.vs/
 
+# Release files
+SituationalAwareness*.zip
+
 # Internal development material — design decisions, test protocols, the
 # Claude Code project hub — not part of the shipped mod, kept local only.
 notes/
