@@ -27,6 +27,12 @@ namespace SituationalAwareness.UI
 		private const float DialColWidth = 138f;
 		private const float VDividerWidth = 1f;
 		private const string InputLockId = "SA_WINDOW";
+
+		// Strip weather block (2026-09-15): icon + external temperature,
+		// no name label and no severity badge — see BuildStrip/ApplyStrip.
+		private GameObject stripWeatherGo;
+		private Image stripWeatherIcon;
+		private Text stripWeatherTemp;
 		private const double LowTempAlertC = 0.0;
 		private const double HighTempAlertC = 50.0;
 		// EXT TEMP now 3-tier (M3 restyling, user request): warn between
@@ -594,6 +600,8 @@ namespace SituationalAwareness.UI
 		}
 
 		private const float WeatherIconSize = 32f;
+		/// <summary>Strip's own weather icon, smaller than the extended widget's 32px (2026-09-15): the strip row is 22px of content inside a 30px bar, same size class as the mini-dial's 22px-tall icon box.</summary>
+		private const float StripWeatherIconSize = 18f;
 		private const float WeatherForecastSpacerHeight = 6f;
 		private const float WeatherBadgeSize = 13f;
 		private const float WeatherCornerSize = 14f;
@@ -686,6 +694,30 @@ namespace SituationalAwareness.UI
 			// auto" on the tail alone, not a stretchy middle element).
 			GameObject stripSpacer = SaUi.Go("Spacer", bar);
 			SaUi.Size(stripSpacer, 0f, -1f, 1f);
+
+			// Weather icon + external temperature (2026-09-15, user request):
+			// right before stripTail, inside the bar's own 8px spacing, so a
+			// hidden block leaves no gap and a shown one still reads as its
+			// own group rather than crowding the "next event" text. No name
+			// label and no severity badge here — see SaWeatherVisibility for
+			// the shared show/hide/lock rule with the extended widget.
+			stripWeatherGo = SaUi.Go("Weather", bar);
+			SaUi.Horizontal(stripWeatherGo, 0, 4f, TextAnchor.MiddleCenter);
+			SaUi.Size(stripWeatherGo, -1f, 22f);
+
+			GameObject stripWeatherIconGo = SaUi.Go("Icon", stripWeatherGo.transform);
+			SaUi.Size(stripWeatherIconGo, StripWeatherIconSize, StripWeatherIconSize);
+			stripWeatherIcon = stripWeatherIconGo.AddComponent<Image>();
+			stripWeatherIcon.preserveAspect = true;
+			stripWeatherIcon.enabled = false;
+
+			stripWeatherTemp = SaUi.Label(stripWeatherGo.transform, "-", 10, SaUi.Text, TextAnchor.MiddleLeft);
+			SaUi.Size(stripWeatherTemp.gameObject, -1f, 22f);
+
+			// Starts hidden like every other conditional strip element
+			// (stripDate, the mode-specific branches in ApplyStrip): nothing
+			// classified yet on the very first frame.
+			stripWeatherGo.SetActive(false);
 
 			stripTail = SaUi.Label(bar, "-", 10, SaUi.TextDim, TextAnchor.MiddleRight);
 			SaUi.Size(stripTail.gameObject, -1f, 22f);
@@ -929,7 +961,7 @@ namespace SituationalAwareness.UI
 			// doc comment for why. Checked every tick, not just on mode
 			// change: BodyHasAtmosphere could theoretically differ if the
 			// active vessel changes without a mode change, and it's cheap.
-			bool showAtmosphericRows = (r.Mode == SaMode.Surface || r.Mode == SaMode.TidalLock) && r.BodyHasAtmosphere;
+			bool showAtmosphericRows = SaWeatherVisibility.ShowAtmosphericRows(r);
 			if (extTempRowGo != null) extTempRowGo.SetActive(showAtmosphericRows);
 			if (pressureRowGo != null) pressureRowGo.SetActive(showAtmosphericRows);
 			// Weather extension host (bug fix 2026-08-17): same rule as
@@ -951,10 +983,8 @@ namespace SituationalAwareness.UI
 			// only its own setting for this; consent is the companion's
 			// business (before it is given the companion keeps its button
 			// hidden, after a Decline the setting itself goes back off).
-			bool unknown = r.Weather.State == SaWeatherState.Unknown;
-			bool keepForReport = SaParams.EnableWeatherReport && SaExtensionPoint.HasCornerSubscriber;
-			bool showWeather = (r.Mode == SaMode.Surface || r.Mode == SaMode.TidalLock)
-				&& (!unknown || keepForReport);
+			SaWeatherVisibility.Level weatherVis = SaWeatherVisibility.Compute(r);
+			bool showWeather = weatherVis != SaWeatherVisibility.Level.Hidden;
 			if (weatherSectionGo != null) weatherSectionGo.SetActive(showWeather);
 			// Science gate (go 2026-09-10): a value not yet measured on this
 			// body shows "???" in dim text — the row stays, so the layout does
@@ -973,9 +1003,12 @@ namespace SituationalAwareness.UI
 				// Unknown-for-the-report has no "?": that mark means "there is
 				// a reading, go and earn it", and on an airless moon there is
 				// none to earn. It gets an "X" instead (user, 2026-09-12).
-				if (unknown) SetWeatherLocked(LockedBadge.NoReading);
-				else if (r.WeatherUnlocked) SetWeatherSection(r.Weather, r.BodyNameInternal, r.SunElevationDeg, r.UT);
-				else SetWeatherLocked(LockedBadge.Gated);
+				switch (weatherVis)
+				{
+					case SaWeatherVisibility.Level.LockedNoReading: SetWeatherLocked(LockedBadge.NoReading); break;
+					case SaWeatherVisibility.Level.LockedGated: SetWeatherLocked(LockedBadge.Gated); break;
+					default: SetWeatherSection(r.Weather, r.BodyNameInternal, r.SunElevationDeg, r.UT); break;
+				}
 			}
 			SetHullTemperatureRow(r.HullTempK, r.HullTempWorstRatio);
 			SetRow("gravity", FormatGravity(r, out Color gravityColor), gravityColor);
@@ -1521,6 +1554,77 @@ namespace SituationalAwareness.UI
 						+ FormatTerminator(r.TerminatorDistanceKm, r.TerminatorDistanceDeg, r.TerminatorToEast) + "</color>";
 					break;
 			}
+			ApplyStripWeather(r);
+		}
+
+		/// <summary>
+		/// Strip's weather icon + external temperature (2026-09-15, user
+		/// request): same SaWeatherVisibility the extended widget uses, so
+		/// the two views can never show it in different situations. No name
+		/// label (the icon alone carries the state) and no severity badge
+		/// (user: "senza badge") — just the glyph, tinted the same neutral
+		/// grey as the widget's default state colour when unlocked, or the
+		/// dim locked colour when not. The locked icon itself now carries a
+		/// padlock (user is redrawing SA_weather_locked.png), which is why
+		/// there is no separate "?" mark here the way the widget's corner
+		/// badge has one.
+		/// </summary>
+		private void ApplyStripWeather(SaReadout r)
+		{
+			SaWeatherVisibility.Level vis = SaWeatherVisibility.Compute(r);
+			bool show = vis != SaWeatherVisibility.Level.Hidden;
+			if (stripWeatherGo != null) stripWeatherGo.SetActive(show);
+			if (!show) return;
+
+			string iconPath;
+			Color iconColor;
+			if (vis == SaWeatherVisibility.Level.Shown)
+			{
+				bool isNight = r.SunElevationDeg < 0.0;
+				// Flavor can still override the icon here (user: "rispetta
+				// icone custom in WEATHER_FLAVOR") — same lookup the widget
+				// uses, name output discarded since the strip has no label.
+				SaWeatherFlavor.Resolve(r.BodyNameInternal, r.Weather.State, isNight, null,
+					SaWeatherIcons.PathFor(r.Weather.State, isNight), out _, out iconPath);
+				iconColor = SaUi.Text;
+			}
+			else
+			{
+				iconPath = SaWeatherIcons.LockedPath;
+				iconColor = SaUi.TextDim;
+			}
+			if (stripWeatherIcon != null)
+			{
+				Sprite sprite = SaWeatherIcons.Load(iconPath);
+				stripWeatherIcon.sprite = sprite;
+				stripWeatherIcon.enabled = sprite != null;
+				stripWeatherIcon.color = iconColor;
+			}
+
+			// Same rule as the extended EXT TEMP row (SaWeatherVisibility.
+			// ShowAtmosphericRows): an airless body showing weather only from
+			// inside a plume has no ambient temperature to speak of, so the
+			// icon stands alone there rather than showing a stale or made-up
+			// figure.
+			bool showTemp = SaWeatherVisibility.ShowAtmosphericRows(r);
+			if (stripWeatherTemp != null)
+			{
+				stripWeatherTemp.gameObject.SetActive(showTemp);
+				if (showTemp)
+				{
+					if (r.ExtTempUnlocked)
+					{
+						FormatExtTemp(r.ExternalTemperatureK, out string text, out Color c);
+						stripWeatherTemp.text = text;
+						stripWeatherTemp.color = c;
+					}
+					else
+					{
+						stripWeatherTemp.text = Loc("#LOC_SA_val_gated");
+						stripWeatherTemp.color = SaUi.TextDim;
+					}
+				}
+			}
 		}
 
 		// ------------------------------------------------------------- units
@@ -1574,20 +1678,30 @@ namespace SituationalAwareness.UI
 		/// <summary>EXT TEMP: 3-tier now (M3 restyling) — cyan cold, neutral, warn (50-100°C), danger (&gt;100°C). Absolute thresholds make sense here: it's the one true ambient reading, not a part-specific value.</summary>
 		private void SetTemperatureRow(double kelvin)
 		{
+			FormatExtTemp(kelvin, out string text, out Color c);
+			SetRow("temperature", text, c);
+		}
+
+		/// <summary>
+		/// Same text + colour FormatExtTemp always produced for SetTemperatureRow,
+		/// pulled out (2026-09-15) so the strip's weather block can show the exact
+		/// same figure without a second copy of the thresholds to drift out of sync.
+		/// </summary>
+		private static void FormatExtTemp(double kelvin, out string text, out Color color)
+		{
 			double celsius = kelvin - 273.15;
 			// N1 (thousands separator, retest 2026-07-28 — matches FLUX's
 			// N0): HULL TEMP in particular routinely hits four figures on
 			// reentry (1500-2000+ K), where a bare "1500.0" reads slower
 			// than "1,500.0".
-			string text = SaPersist.TempUnit == SaTempUnit.Kelvin
+			text = SaPersist.TempUnit == SaTempUnit.Kelvin
 				? F(kelvin, "N1") + " K"
 				: F(celsius, "N1") + " °C";
 
-			Color c = SaUi.Text;
-			if (celsius < LowTempAlertC) c = SaUi.Cyan;
-			else if (celsius > VeryHighTempAlertC) c = SaUi.Danger;
-			else if (celsius > HighTempAlertC) c = SaUi.Warn;
-			SetRow("temperature", text, c);
+			color = SaUi.Text;
+			if (celsius < LowTempAlertC) color = SaUi.Cyan;
+			else if (celsius > VeryHighTempAlertC) color = SaUi.Danger;
+			else if (celsius > HighTempAlertC) color = SaUi.Warn;
 		}
 
 		/// <summary>HULL TEMP (M3 restyling): value is the thermal-mass-weighted average (SaReadoutProvider.BuildHullTemperature), but the COLOR comes from worstRatio — the single hottest part's T/maxTemp — so one part near its limit shows red even while the fleet-wide average still looks comfortable. Cold side stays absolute (sub-zero is sub-zero for any material).</summary>
@@ -1678,7 +1792,9 @@ namespace SituationalAwareness.UI
 		/// <summary>Which mark sits on the locked cloud, see SetWeatherLocked.</summary>
 		private enum LockedBadge
 		{
-			/// <summary>Science gate: cyan "?" — there is a reading, go and earn it.</summary>
+			/// <summary>Science gate: no badge — the padlock now drawn into
+			/// SA_weather_locked.png says it by itself (user, 2026-09-16).
+			/// Used to be a cyan "?"; retired, not reassigned.</summary>
 			Gated,
 			/// <summary>Nothing to read here at all: amber "X", the colour of the
 			/// companion's ✎ next to it, since the section is only on screen
@@ -1689,9 +1805,10 @@ namespace SituationalAwareness.UI
 		/// <summary>
 		/// The science gate's version of the section (go 2026-09-10): the
 		/// plain locked cloud in the dim text grey under UNKNOWN — the one
-		/// weather label that is uppercase — with a "?" in the badge corner.
-		/// Also the face of a genuinely unknown sky kept visible for the
-		/// Weather Report (2026-09-12), then with an "X" instead. No forecast
+		/// weather label that is uppercase — with the icon carrying its own
+		/// padlock (a cyan "?" badge did this job until 2026-09-16). Also
+		/// the face of a genuinely unknown sky kept visible for the Weather
+		/// Report (2026-09-12), then with an amber "X" instead. No forecast
 		/// either way: a sky you cannot read has no tomorrow.
 		/// </summary>
 		private void SetWeatherLocked(LockedBadge badge)
@@ -1710,14 +1827,17 @@ namespace SituationalAwareness.UI
 				weatherIcon.enabled = sprite != null;
 			}
 			if (weatherIcon != null) weatherIcon.color = SaUi.TextDim;
-			// Cyan, not the icon's own dim grey (user, test 2026-09-11): the
-			// mark has to stand out from the cloud it sits on, and cyan is the
-			// panel's "information" colour — not an alert like amber or red.
-			// The "X" is amber on purpose: same ffb000 as the companion's ✎
-			// (ReportUi duplicates SaUi's palette), so the two read as one
-			// thing — "no weather here, but you can still report that".
-			if (badge == LockedBadge.Gated) SetWeatherBadge("?", SaUi.Cyan);
-			else SetWeatherBadge("X", SaUi.Amber);
+			// No badge for the science gate any more (user, 2026-09-16): the
+			// padlock now drawn into SA_weather_locked.png already says
+			// "there is a reading, go and earn it" — the cyan "?" that used
+			// to carry that meaning would just repeat the icon. The "X" for
+			// NoReading stays: it is a different situation (nothing to read
+			// at all, kept on screen only for the Weather Report), amber on
+			// purpose — same ffb000 as the companion's ✎ (ReportUi
+			// duplicates SaUi's palette), so the two read as one thing —
+			// "no weather here, but you can still report that".
+			if (badge == LockedBadge.NoReading) SetWeatherBadge("X", SaUi.Amber);
+			else SetWeatherBadge(null, SaUi.Cyan);
 			SetWeatherForecast(default(SaWeatherForecast), 0.0);
 		}
 

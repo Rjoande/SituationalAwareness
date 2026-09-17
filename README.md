@@ -16,9 +16,9 @@ A Kerbal Space Program mod that adds an avionics-style telemetry panel: local ti
 - **Science gate** (Science/Career, on by default, switchable in Difficulty Settings): the panel does not show a number you have not measured yet. EXT TEMP, PRESSURE, live GRAVITY and WEATHER read "???" / UNKNOWN on a body until the matching experiment — thermometer, barometer, gravimeter, atmosphere analysis (or Bluedog's orbital weather observation) — has been credited there, in any situation or biome. Which experiment opens which readout is a config (`ScienceGate.cfg`), so a pack with its own instruments can patch it.
 - **Weather Report** (optional, off by default): when SA's weather does not match what you see, one press writes a local sample you can send to the author, so the classifier can be tuned on real skies. See [Weather Report](#weather-report) below — nothing is ever sent automatically.
 - **Localization**: English and Italian.
-- **Collapsible strip mode** for a compact, always-visible readout, and a toolbar button (stock toolbar or Blizzy's, via ToolbarControl) to open/close the panel. Double click on the titlebar to collapse/expand.
+- **Collapsible strip mode** for a compact, always-visible readout — including the weather icon and external temperature when there is one to show — and a toolbar button (stock toolbar or Blizzy's, via ToolbarControl) to open/close the panel. Double click on the titlebar to collapse/expand.
 - **Cyclable units** everywhere it makes sense: °C/K, kPa/atm, g/m·s², decimal/DMS coordinates, km/degrees for terminator distance. Click the value or label to switch.
-- **Adjustable panel scale** (Difficulty Settings), independent of the game's own UI Scale.
+- **Adjustable panel scale** (set in Difficulty Settings, but global: one value for every save), independent of the game's own UI Scale.
 
 ## Requirements
 
@@ -47,7 +47,7 @@ The weather classifier was tuned on one installation (the author's, JNSQ-Reborn 
 **How to report**
 
 1. When the sky disagrees with SA, click ✎. The Weather Report window shows what SA currently reads.
-2. Optionally type a note (planet pack, what you see, anything useful), then press the label that matches the real sky: Clear, Cloud, Fog, Rain, Storm, Snow, Dust or Other.
+2. Optionally type a note (planet pack, what you see, anything useful), then press the label that matches the real sky: Clear, Cloud, Fog, Rain, Storm, Snow, Dust or Other. A short message at the top of the screen confirms the sample was written.
 3. That is one sample. Report as many as you like, over as many sessions as you like; they all go to the same file.
 
 Each sample records the raw values SA read from EVE's cloud layers, SA's own classification, your vessel and camera position, altitude, universal time, body, biome, sun elevation and solar flux, the cloud transmittance reported by WeatherDrivenSolarPanel if installed, plus your label and note. Once per session, at the first report, the plugin also writes the list of loaded plugins (names and versions only), because the same sample means different things under different visual packs. No personal information, account name, file path or system detail is collected.
@@ -62,7 +62,7 @@ GameData/SituationalAwareness/PluginData/WeatherReport/
 
 **How to send them**
 
-Upload both files here (no account needed):
+Upload both files here — no account needed:
 
 **https://www.dropbox.com/request/9khup21i0c1xm1bk4w8o**
 

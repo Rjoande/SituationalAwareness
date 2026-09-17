@@ -4,6 +4,9 @@
 src/obj/
 src/bin/
 src/.vs/
+weatherreport-src/obj/
+weatherreport-src/bin/
+weatherreport-src/.vs/
 
 # Internal development material — design decisions, test protocols, the
 # Claude Code project hub — not part of the shipped mod, kept local only.
