@@ -6,9 +6,14 @@
     <LangVersion>8.0</LangVersion>
     <AssemblyName>SaWeatherReport</AssemblyName>
     <RootNamespace>SituationalAwareness.WeatherReport</RootNamespace>
-    <Version>0.2.2</Version>
+    <Version>0.2.3</Version>
     <DebugType>none</DebugType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- KSP install the reference assemblies come from. Defaults to the game
+         root three levels up (the repo living in <KSP>/GameData/SituationalAwareness);
+         when the repo lives elsewhere, pass it explicitly (2026-09-18):
+             dotnet build -c Release -p:KspRoot="E:\games\KSP" -->
+    <KspRoot Condition="'$(KspRoot)' == ''">$(MSBuildProjectDirectory)\..\..\..</KspRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,31 +23,31 @@
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(KspRoot)\KSP_x64_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>$(KspRoot)\KSP_x64_Data\Managed\UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(KspRoot)\KSP_x64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(KspRoot)\KSP_x64_Data\Managed\UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UIModule">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+      <HintPath>$(KspRoot)\KSP_x64_Data\Managed\UnityEngine.UIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>$(KspRoot)\KSP_x64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\KSP_x64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>$(KspRoot)\KSP_x64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <!-- SA's own extension point (SaExtensionPoint) — the only public
@@ -58,11 +63,11 @@
          (notes/indagine-meteo.md §6) — players without EVE installed must
          never hit a missing-assembly crash. -->
     <Reference Include="Atmosphere">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\GameData\EnvironmentalVisualEnhancements\Plugins\Atmosphere.dll</HintPath>
+      <HintPath>$(KspRoot)\GameData\EnvironmentalVisualEnhancements\Plugins\Atmosphere.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="EVEManager">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\..\GameData\EnvironmentalVisualEnhancements\Plugins\EVEManager.dll</HintPath>
+      <HintPath>$(KspRoot)\GameData\EnvironmentalVisualEnhancements\Plugins\EVEManager.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

@@ -602,6 +602,7 @@ namespace SituationalAwareness.UI
 		private const float WeatherIconSize = 32f;
 		/// <summary>Strip's own weather icon, smaller than the extended widget's 32px (2026-09-15): the strip row is 22px of content inside a 30px bar, same size class as the mini-dial's 22px-tall icon box.</summary>
 		private const float StripWeatherIconSize = 18f;
+		private const float StripWeatherTempWidth = 62f;
 		private const float WeatherForecastSpacerHeight = 6f;
 		private const float WeatherBadgeSize = 13f;
 		private const float WeatherCornerSize = 14f;
@@ -705,14 +706,18 @@ namespace SituationalAwareness.UI
 			SaUi.Horizontal(stripWeatherGo, 0, 4f, TextAnchor.MiddleCenter);
 			SaUi.Size(stripWeatherGo, -1f, 22f);
 
+			// Temperature first, icon last (user request 2026-09-18). Fixed
+			// width + right alignment so the figure's right edge, and with it
+			// the icon, never shifts as digits come and go ("9.9" to "-12.3",
+			// "1,234.5 K"); sized for the longest expected text.
+			stripWeatherTemp = SaUi.Label(stripWeatherGo.transform, "-", 10, SaUi.Text, TextAnchor.MiddleRight);
+			SaUi.Size(stripWeatherTemp.gameObject, StripWeatherTempWidth, 22f);
+
 			GameObject stripWeatherIconGo = SaUi.Go("Icon", stripWeatherGo.transform);
 			SaUi.Size(stripWeatherIconGo, StripWeatherIconSize, StripWeatherIconSize);
 			stripWeatherIcon = stripWeatherIconGo.AddComponent<Image>();
 			stripWeatherIcon.preserveAspect = true;
 			stripWeatherIcon.enabled = false;
-
-			stripWeatherTemp = SaUi.Label(stripWeatherGo.transform, "-", 10, SaUi.Text, TextAnchor.MiddleLeft);
-			SaUi.Size(stripWeatherTemp.gameObject, -1f, 22f);
 
 			// Starts hidden like every other conditional strip element
 			// (stripDate, the mode-specific branches in ApplyStrip): nothing
@@ -1000,13 +1005,12 @@ namespace SituationalAwareness.UI
 			}
 			if (showWeather)
 			{
-				// Unknown-for-the-report has no "?": that mark means "there is
-				// a reading, go and earn it", and on an airless moon there is
-				// none to earn. It gets an "X" instead (user, 2026-09-12).
+				// Both locked cases (science gate, unknown sky kept for the report)
+				// share the padlock face, no badge (2026-09-19).
 				switch (weatherVis)
 				{
-					case SaWeatherVisibility.Level.LockedNoReading: SetWeatherLocked(LockedBadge.NoReading); break;
-					case SaWeatherVisibility.Level.LockedGated: SetWeatherLocked(LockedBadge.Gated); break;
+					case SaWeatherVisibility.Level.LockedNoReading:
+					case SaWeatherVisibility.Level.LockedGated: SetWeatherLocked(); break;
 					default: SetWeatherSection(r.Weather, r.BodyNameInternal, r.SunElevationDeg, r.UT); break;
 				}
 			}
@@ -1789,29 +1793,16 @@ namespace SituationalAwareness.UI
 			SetWeatherForecast(weather.Forecast, ut);
 		}
 
-		/// <summary>Which mark sits on the locked cloud, see SetWeatherLocked.</summary>
-		private enum LockedBadge
-		{
-			/// <summary>Science gate: no badge — the padlock now drawn into
-			/// SA_weather_locked.png says it by itself (user, 2026-09-16).
-			/// Used to be a cyan "?"; retired, not reassigned.</summary>
-			Gated,
-			/// <summary>Nothing to read here at all: amber "X", the colour of the
-			/// companion's ✎ next to it, since the section is only on screen
-			/// for the report's sake.</summary>
-			NoReading
-		}
-
 		/// <summary>
 		/// The science gate's version of the section (go 2026-09-10): the
 		/// plain locked cloud in the dim text grey under UNKNOWN — the one
 		/// weather label that is uppercase — with the icon carrying its own
 		/// padlock (a cyan "?" badge did this job until 2026-09-16). Also
 		/// the face of a genuinely unknown sky kept visible for the Weather
-		/// Report (2026-09-12), then with an amber "X" instead. No forecast
+		/// Report (2026-09-12), likewise without a badge. No forecast
 		/// either way: a sky you cannot read has no tomorrow.
 		/// </summary>
-		private void SetWeatherLocked(LockedBadge badge)
+		private void SetWeatherLocked()
 		{
 			if (weatherLabel != null)
 			{
@@ -1827,17 +1818,11 @@ namespace SituationalAwareness.UI
 				weatherIcon.enabled = sprite != null;
 			}
 			if (weatherIcon != null) weatherIcon.color = SaUi.TextDim;
-			// No badge for the science gate any more (user, 2026-09-16): the
-			// padlock now drawn into SA_weather_locked.png already says
-			// "there is a reading, go and earn it" — the cyan "?" that used
-			// to carry that meaning would just repeat the icon. The "X" for
-			// NoReading stays: it is a different situation (nothing to read
-			// at all, kept on screen only for the Weather Report), amber on
-			// purpose — same ffb000 as the companion's ✎ (ReportUi
-			// duplicates SaUi's palette), so the two read as one thing —
-			// "no weather here, but you can still report that".
-			if (badge == LockedBadge.NoReading) SetWeatherBadge("X", SaUi.Amber);
-			else SetWeatherBadge(null, SaUi.Cyan);
+			// No badge in either case (user, 2026-09-16 for the science gate,
+			// 2026-09-19 for the unknown-sky/Weather Report case): the padlock
+			// icon and the UNKNOWN label say it already. The cyan "?" and the
+			// amber "X" that used to sit here are retired.
+			SetWeatherBadge(null, SaUi.Cyan);
 			SetWeatherForecast(default(SaWeatherForecast), 0.0);
 		}
 

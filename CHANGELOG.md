@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.3
+
+### Changed
+
+- The amber "X" badge on the locked weather icon is gone too.
+- Collapsed strip: the temperature now comes before the weather icon.
+
 ## v0.2.2
 
 ### Added
