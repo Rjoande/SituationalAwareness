@@ -15,8 +15,7 @@ namespace SituationalAwareness
 
 	/// <summary>
 	/// Toolbar button opening/closing the single SaWindow. Flight scene only
-	/// (design doc §6.9) — SA reads live vessel telemetry, there is nothing
-	/// meaningful to show in the editor.
+	/// (design doc §6.9): SA reads live vessel telemetry.
 	/// </summary>
 	[KSPAddon(KSPAddon.Startup.Flight, false)]
 	public class SaToolbarApp : MonoBehaviour
@@ -28,9 +27,9 @@ namespace SituationalAwareness
 
 		public void Start()
 		{
-			// Fresh flight scene: the weather classifier's caches are keyed on
-			// EVE layer objects that do not survive one, and dropping the flavor
-			// table picks up a ModuleManager reload made mid-session.
+			// The classifier's caches are keyed on EVE layer objects that do not
+			// survive a scene change; dropping the config tables also picks up a
+			// ModuleManager reload made mid-session.
 			Core.WeatherClassifier.Reset();
 			Core.SaWeatherFlavor.Reset();
 			Core.SaScienceGate.Reset();

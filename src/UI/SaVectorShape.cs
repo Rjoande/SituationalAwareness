@@ -6,9 +6,8 @@ namespace SituationalAwareness.UI
 {
 	/// <summary>
 	/// Draws a polyline through local-space points as a triangle strip in
-	/// OnPopulateMesh — pure UGUI, no external asset (ported pattern from
-	/// KRAB's KrabCurveLine.cs, design doc §6.2: dials are drawn, never
-	/// Unicode glyphs — lesson from KRAB's non-rendering ⟳).
+	/// OnPopulateMesh: pure UGUI, no external asset. Dials are drawn this way and
+	/// never with Unicode glyphs, which a stock font may not render (design doc §6.2).
 	/// </summary>
 	internal class SaVectorLine : MaskableGraphic
 	{
@@ -36,17 +35,11 @@ namespace SituationalAwareness.UI
 				{
 					AddSegment(vh, points[i], points[i + 1]);
 				}
-                // Round joins at interior vertices (bug fix 2026-07-22, orbit
-                // dial "puntini"): each segment is its own quad, extruded
-                // perpendicular to ITS OWN direction. On a curved polyline
-                // consecutive segments point in slightly different
-                // directions, so their quads don't share an edge at the
-                // joint — a wedge-shaped gap opens at every vertex, sized by
-                // the local turn angle. More segments (24->90, earlier fix)
-                // shrinks each gap but can't remove it; a small disc at each
-                // joint closes it regardless of turn direction. Previously
-                // this let whatever was drawn underneath (e.g. the lit-color
-                // base ring under the shadow arc) show through as dots.
+                // Round joins at interior vertices: each segment is its own quad
+                // extruded along its own direction, so on a curved polyline the
+                // quads do not share an edge and a wedge gap opens at every
+                // vertex, letting whatever is underneath show through as dots. A
+                // small disc closes it regardless of turn direction.
                 for (int i = 1; i < points.Count - 1; i++)
                 {
 					AddJoin(vh, points[i]);
@@ -119,7 +112,7 @@ namespace SituationalAwareness.UI
 		}
 	}
 
-	/// <summary>Filled circle marker (sun/vessel dot) as a triangle fan — same no-asset approach as SaVectorLine.</summary>
+	/// <summary>Filled circle marker (sun/vessel dot) as a triangle fan, same no-asset approach as SaVectorLine.</summary>
 	internal class SaVectorDot : MaskableGraphic
 	{
 		public Vector2 center;

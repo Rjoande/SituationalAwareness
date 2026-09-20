@@ -7,26 +7,17 @@ using UnityEngine.UI;
 namespace SituationalAwareness.WeatherReport
 {
 	/// <summary>
-	/// Entry point: puts a single small button in the top-right corner of
-	/// SA's weather section (SA keeps that section on screen, as UNKNOWN,
-	/// wherever the report setting is on — a footer slot was tried on
-	/// 2026-09-11 and looked like a stray square), which opens the report's
-	/// own window — but only once the
-	/// player has switched the report on in SA's settings AND accepted the
-	/// disclaimer (ReportConsent). Before that the companion is inert: no
-	/// button, no window, no file.
+	/// Entry point: puts one small button in the top-right corner of SA's weather
+	/// section, opening the report's own window. SA keeps that section on screen
+	/// as UNKNOWN wherever the report setting is on, so the button stays
+	/// reachable. Before the player switches the report on AND accepts the
+	/// disclaimer the companion is inert: no button, no window, no file.
 	///
-	/// The setting lives in SA (SaParams.enableWeatherReport) because a
-	/// GameParameters checkbox has no click callback of its own: this class
-	/// re-evaluates it when the flight scene starts and whenever settings are
-	/// applied (GameEvents.OnGameSettingsApplied), and that is where the
-	/// disclaimer gets shown. Declining writes the setting back to off, so the
-	/// dialog returns the next time it is switched on.
-	///
-	/// The button row used to live inline under SA's dial. Once SA grew its own
-	/// weather readout there the two were competing for the same 138px column,
-	/// so the report moved out into a window of its own (notes/indagine-meteo.md
-	/// §8) and only the opener stayed behind.
+	/// The setting lives in SA because a GameParameters checkbox has no click
+	/// callback of its own: this class re-evaluates it when the flight scene
+	/// starts and whenever settings are applied, which is where the disclaimer
+	/// appears. Declining writes the setting back to off, so the dialog returns
+	/// the next time it is switched on.
 	/// </summary>
 	[KSPAddon(KSPAddon.Startup.Flight, false)]
 	internal class WeatherReportApp : MonoBehaviour
@@ -37,13 +28,13 @@ namespace SituationalAwareness.WeatherReport
 
 		private void Start()
 		{
-			// Re-subscribe on every firing, not once (SaExtensionPoint's own
-			// contract): SA destroys and rebuilds this Transform on every
-			// collapsed<->extended toggle and window re-open.
+			// Re-populate on every firing, not once: SaExtensionPoint's contract
+			// is that SA rebuilds this Transform on every collapse toggle and
+			// window re-open.
 			SaExtensionPoint.OnWeatherCornerBuilt += BuildOpenerButton;
 			GameEvents.OnGameSettingsApplied.Add(Evaluate);
-			// One frame later: the flight UI is not ready for a popup inside
-			// the very Start() that loads the scene.
+			// One frame later: the flight UI is not ready for a popup inside the
+			// Start() that loads the scene.
 			StartCoroutine(EvaluateNextFrame());
 		}
 
@@ -113,8 +104,8 @@ namespace SituationalAwareness.WeatherReport
 		private void OnDecline()
 		{
 			dialog = null;
-			// Back to off, in the save's own settings: the player sees the
-			// checkbox unticked, and ticking it again brings the dialog back.
+			// Back to off in the save's own settings, so the player sees the
+			// checkbox unticked and ticking it again brings the dialog back.
 			if (HighLogic.CurrentGame != null)
 			{
 				HighLogic.CurrentGame.Parameters.CustomParams<SaParams>().enableWeatherReport = false;
@@ -139,18 +130,16 @@ namespace SituationalAwareness.WeatherReport
 			button.colors = colors;
 			button.targetGraphic = background;
 
-			// A pencil-ish glyph rather than an icon file: the companion ships
-			// no textures of its own, and one character keeps it to the 14px
-			// corner SA reserves.
+			// A pencil-ish glyph rather than an icon file: the companion ships no
+			// textures, and one character fits the 14px corner SA reserves.
 			Text glyph = ReportUi.Label(go.transform, "✎", 11, ReportUi.Amber, TextAnchor.MiddleCenter);
 			ReportUi.Stretch(glyph.rectTransform);
 
 			button.onClick.AddListener(ToggleWindow);
 
-			// The opener IS the "report is active" indicator (§8.3): it exists
-			// only while the setting is on and consent is on record. The SLOT
-			// itself is toggled; it sits outside SA's layout, so this moves
-			// nothing either way.
+			// The opener IS the "report is active" indicator: it exists only while
+			// the setting is on and consent is on record. The slot itself is
+			// toggled, and sits outside SA's layout, so this moves nothing.
 			opener = corner.gameObject;
 			opener.SetActive(Active);
 		}

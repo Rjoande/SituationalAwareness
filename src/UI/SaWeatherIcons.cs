@@ -5,24 +5,19 @@ using UnityEngine;
 namespace SituationalAwareness.UI
 {
 	/// <summary>
-	/// Texture lookup for the weather section's icon.
+	/// Texture lookup for the weather section's icon. Icons are authored WHITE
+	/// on transparent and tinted at runtime, so one texture serves every colour
+	/// a state can be shown in.
 	///
-	/// Icons are authored WHITE on transparent and tinted at runtime, so one
-	/// texture serves every colour the state can be shown in — the panel keeps
-	/// its single-hue avionics look and a new state colour needs no new art.
-	///
-	/// Everything here degrades quietly: a missing texture means the section
-	/// shows its text label alone. That is deliberate — the art is authored
-	/// separately from the code, and a build that hard-failed on a missing PNG
-	/// would block the mod on an asset that is allowed to arrive later.
+	/// Every lookup degrades quietly: a missing texture leaves the section with
+	/// its text label alone, so art may arrive after the code.
 	/// </summary>
 	internal static class SaWeatherIcons
 	{
 		private const string Folder = "SituationalAwareness/Textures/";
 
-		// Two optional night variants: SA already knows the sun's elevation, so
-		// a "clear night" can show stars instead of a sun for free. Absent
-		// files simply fall back to the day icon.
+		// Optional night variants: SA knows the sun's elevation, so a clear night
+		// can show stars instead of a sun. Absent files fall back to the day icon.
 		private const string NightSuffix = "_night";
 
 		private static readonly Dictionary<SaWeatherState, string> BaseNames =
@@ -38,28 +33,24 @@ namespace SituationalAwareness.UI
 			};
 
 		/// <summary>
-		/// Optional severity mark drawn in the icon's bottom-left corner. Absent
-		/// by default: SA draws a bold "!" from its own font instead, which was
-		/// judged good enough at real size. Dropping this PNG in overrides it
-		/// with no code change — white where it should take the severity colour,
-		/// dark where it should stay dark, since the tint is multiplicative.
+		/// Optional severity mark for the icon's corner, overriding the bold "!"
+		/// SA otherwise draws from its own font. White where it should take the
+		/// severity colour, dark where it should stay dark: the tint multiplies.
 		/// </summary>
 		internal const string AlertPath = Folder + "SA_weather_alert";
 
 		/// <summary>
-		/// Icon for a weather section the science gate keeps closed (a plain
-		/// cloud, drawn by the user 2026-09-09): shown dimmed, with a "?" in
-		/// the badge corner, under the one weather label that is uppercase.
-		/// Optional like every other texture — absent, the label stands alone.
+		/// Icon for a weather section the science gate keeps closed: a padlock,
+		/// shown dimmed under the one weather label that is uppercase.
 		/// </summary>
 		internal const string LockedPath = Folder + "SA_weather_locked";
 
 		private static readonly Dictionary<string, Sprite> Cache = new Dictionary<string, Sprite>();
 
 		/// <summary>
-		/// GameDatabase path for a state's icon, before any flavor override.
-		/// Night variants apply only to the two states where the difference is
-		/// visible at all — there is no night version of rain worth drawing.
+		/// GameDatabase path for a state's icon, before any flavor override. Night
+		/// variants exist only for the two states where the sky itself is the
+		/// subject; there is no night version of rain worth drawing.
 		/// </summary>
 		internal static string PathFor(SaWeatherState state, bool night)
 		{

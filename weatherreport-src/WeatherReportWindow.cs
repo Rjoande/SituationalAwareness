@@ -7,20 +7,16 @@ namespace SituationalAwareness.WeatherReport
 {
 	/// <summary>
 	/// The report's own window, opened from the small button in the corner of
-	/// SA's weather section.
-	///
-	/// It used to be a cramped 3x3 grid crammed under SA's dial, which fought
-	/// for room with SA's own weather readout and left no space for legible
-	/// labels. As a separate window it can afford full-width buttons, a real
-	/// notes field, and — the point of the whole thing after the §8.6 pivot —
-	/// SA's current verdict shown right next to the buttons, so a report is a
-	/// deliberate "SA says X, I see Y" rather than a blind sample.
+	/// SA's weather section. A window rather than a grid squeezed into SA's own
+	/// 138px column: it can afford full-width buttons, a real notes field, and
+	/// SA's current verdict shown next to them, which is what makes a report a
+	/// deliberate "SA says X, I see Y" instead of a blind sample.
 	/// </summary>
 	internal class WeatherReportWindow : MonoBehaviour
 	{
-		// English on purpose, not localized (user request 2026-08-18): these
-		// strings are the report's own vocabulary and go straight into the CSV,
-		// where a translated label would make pooled data unusable.
+		// English on purpose, not localized: these strings are the report's own
+		// vocabulary and go straight into the CSV, where a translated label would
+		// make pooled data unusable.
 		private static readonly string[] Labels =
 		{
 			"Clear", "Cloud", "Fog", "Rain", "Storm", "Snow", "Dust", "Other"
@@ -38,11 +34,10 @@ namespace SituationalAwareness.WeatherReport
 		private float nextVerdictRefresh;
 
 		/// <summary>
-		/// Held for as long as the note field has keyboard focus (fix
-		/// 2026-09-14, user: typing a note fired flight commands). The hover
-		/// lock in ReportWindowDrag sits on the header only, and the pointer
-		/// is rarely on the header while typing — focus, not hover, is what
-		/// decides where keystrokes go.
+		/// Held for as long as the note field has keyboard focus, or typing a note
+		/// fires flight commands. The hover lock in ReportWindowDrag sits on the
+		/// header alone, where the pointer rarely is while typing: focus, not
+		/// hover, decides where keystrokes go.
 		/// </summary>
 		private const string TypingLockId = "SA_WeatherReport_typing";
 		private bool typingLocked;
@@ -185,8 +180,8 @@ namespace SituationalAwareness.WeatherReport
 		{
 			scaler.scaleFactor = GameSettings.UI_SCALE;
 			SetTypingLock(noteField != null && noteField.isFocused);
-			// Once a second is plenty — SA's own classifier is throttled to the
-			// same rate, so polling faster would just re-read a cached value.
+			// Once a second: SA's own classifier is throttled to the same rate, so
+			// polling faster would only re-read a cached value.
 			if (Time.unscaledTime < nextVerdictRefresh) return;
 			nextVerdictRefresh = Time.unscaledTime + 1f;
 			RefreshVerdict();
@@ -203,8 +198,8 @@ namespace SituationalAwareness.WeatherReport
 			}
 			catch (Exception)
 			{
-				// An SA too old to expose the verdict is not a reason to break
-				// the report — the buttons still work, the column is just empty.
+				// An SA too old to expose the verdict is no reason to break the
+				// report: the buttons still work, the column is just empty.
 				verdictLabel.text = "";
 			}
 		}
@@ -213,10 +208,9 @@ namespace SituationalAwareness.WeatherReport
 		{
 			WeatherSample sample = WeatherProbe.Sample(FlightGlobals.ActiveVessel);
 			bool written = WeatherReportCsvWriter.Write(label, noteField != null ? noteField.text : "", sample);
-			// Immediate on-screen confirmation (user request 2026-09-14): the
-			// button itself gives no sign that anything happened. Stock
-			// ScreenMessages, upper centre, same place the game's own
-			// "quicksave" and warp notices go.
+			// Immediate on-screen confirmation, the button itself giving no sign
+			// that anything happened. Stock ScreenMessages, upper centre, where
+			// the game's own quicksave and warp notices go.
 			if (written)
 			{
 				ScreenMessages.PostScreenMessage("Weather Report: " + label.ToUpperInvariant() + " recorded", 2.5f, ScreenMessageStyle.UPPER_CENTER);

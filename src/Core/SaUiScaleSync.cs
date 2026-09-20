@@ -3,28 +3,14 @@ using UnityEngine;
 namespace SituationalAwareness.Core
 {
 	/// <summary>
-	/// Keeps SaParams.uiScale (a per-save difficulty slider, the only kind
-	/// of slider the stock settings dialog can host) equal to
-	/// SaPersist.UiScale (the real, player-global value), in both directions.
-	/// Bug fixed 2026-09-14 (user): the scale was a plain GameParameters
-	/// field, so every save had its own and a fresh save came up at 1.0
-	/// again.
+	/// Keeps SaParams.uiScale, a per-save slider because that is the only kind the
+	/// stock settings dialog can host, in sync with the real player-global value
+	/// in SaPersist. It polls rather than listening: the difficulty dialog assigns
+	/// a new GameParameters on dismiss without firing any event.
 	///
-	/// Polling, not events, on purpose: the difficulty dialog assigns a new
-	/// GameParameters on dismiss without firing anything (verified on the
-	/// decompiled MiniSettings.OnDifficultyOptionsDismiss — only the outer
-	/// settings dialog's Apply fires OnGameSettingsApplied, and Cancel there
-	/// keeps the new parameters anyway), and the player can move the slider
-	/// in scenes where no other SA addon is alive (space center, tracking
-	/// station). One dictionary lookup and a float compare per frame, on a
-	/// single object that lives across scenes.
-	///
-	/// Direction rule: a Game instance seen for the first time gets the
-	/// global value pushed INTO its slider (a save is never allowed to
-	/// override the player's choice); after that, any difference can only
-	/// be the player moving the slider, so it flows OUT to the global value
-	/// and is saved at once. KSP creates a new Game instance on every scene
-	/// change, which is fine: the push is a no-op when the two already agree.
+	/// Direction rule: a Game seen for the first time gets the global value pushed
+	/// INTO its slider, so a save never overrides the player's choice; afterwards
+	/// any difference is the player moving it, and flows back out.
 	/// </summary>
 	[KSPAddon(KSPAddon.Startup.Instantly, true)]
 	internal class SaUiScaleSync : MonoBehaviour

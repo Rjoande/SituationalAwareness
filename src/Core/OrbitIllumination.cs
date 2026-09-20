@@ -3,20 +3,15 @@ using UnityEngine;
 
 namespace SituationalAwareness.Core
 {
-	// Binary on purpose (user decision 2026-07-19): a "terminator" phase is a
-	// SURFACE concept (crossing a line on the ground); in orbit there is no
-	// such line, only sunlit or in-shadow. The ring dial still draws the
-	// shadow band as a geometric visual (real umbra half-angle), it just
-	// isn't exposed as a third named phase state.
+	// Binary on purpose: a terminator phase is a SURFACE concept (crossing a line
+	// on the ground), and in orbit there is only sunlit or in-shadow. The ring
+	// dial still draws the shadow band, just not as a third named phase.
 	public enum SaPhaseOrbit { Sunlit, Eclipse }
 
 	/// <summary>
-	/// Orbital illumination (design doc §5.1). Verbatim port of RealBattery's
-	/// OrbitalIlluminationStatus (post-2026-07-14 fix — avoids three bugs the
-	/// earlier split implementation had: sub-solar/anti-solar mixup, mixing
-	/// Orbit.GetOrbitNormal()'s internal frame with world-space vectors, and
-	/// an unbounded true-anomaly-based dt). Deriving phase and time-to-event
-	/// from the same in-plane frame means they can never disagree.
+	/// Orbital illumination (design doc §5.1), a verbatim port of RealBattery's
+	/// OrbitalIlluminationStatus. Phase and time-to-event come from the same
+	/// in-plane frame, so they can never disagree.
 	/// </summary>
 	internal static class OrbitIllumination
 	{
@@ -40,13 +35,9 @@ namespace SituationalAwareness.Core
 		/// <summary>Sunlit fraction of one full orbit (design doc §5.1: 1 - shadow half-angle/π).</summary>
 		public static double LitFraction(Vessel v, CelestialBody body, CelestialBody star)
 		{
-			// Orbiting the star itself (bug fix 2026-07-24): the formula
-			// below assumes "body blocks light from a distant, separate
-			// star" — meaningless when body IS the star (a star's own
-			// radius is huge, so asin(R/a) would come out non-negligible
-			// instead of the true answer, always lit). Same degeneracy
-			// Status() already guards against via the antiSun vector
-			// collapsing to zero when body == star.
+			// Orbiting the star itself: the formula below assumes a body blocking
+			// light from a distant separate star, so asin(R/a) on the star's own
+			// huge radius would shadow an orbit that is in fact always lit.
 			if (body == star) return 1.0;
 
 			double R = body.Radius;
@@ -57,14 +48,12 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Current phase, time to the next terminator crossing, whether the
-		/// vessel is in shadow right now (for the "next event" label:
-		/// eclipse vs light), and the raw in-plane angles — thetaNowRad is
-		/// the vessel's angle from the shadow-center axis (0 = deepest
-		/// shadow), phiRad is the shadow half-angle. Both exposed purely for
-		/// the orbit ring dial (design doc §6.2): in this frame the shadow
-		/// band is fixed at angle 0 by construction, only the vessel marker
-		/// (at thetaNowRad) moves — no extra geometry needed on the UI side.
+		/// Current phase, time to the next terminator crossing, whether the vessel
+		/// is in shadow right now, and the raw in-plane angles: thetaNowRad is the
+		/// vessel's angle from the shadow-center axis (0 = deepest shadow), phiRad
+		/// the shadow half-angle. The angles exist for the ring dial (design doc
+		/// §6.2), where the shadow band sits at angle 0 by construction and only
+		/// the vessel marker moves.
 		/// </summary>
 		public static void Status(Vessel v, CelestialBody body, CelestialBody star,
 			out SaPhaseOrbit phase, out double timeToTransitionSec, out bool inEclipseNow,

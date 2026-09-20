@@ -7,10 +7,10 @@ using UnityEngine;
 namespace SituationalAwareness.WeatherReport
 {
 	/// <summary>
-	/// Multi-row-per-press CSV writer (notes/indagine-meteo.md §7): one
-	/// "press" row (the human label + full context) plus one "layer" row
-	/// per EVE cloud layer sampled, tied together by a shared PressId. Never
-	/// the KSP.log — structured, survives sessions, opens in a spreadsheet.
+	/// Multi-row-per-press CSV writer: one "press" row, the human label plus
+	/// full context, and one "layer" row per EVE cloud layer sampled, tied
+	/// together by a shared PressId. A file rather than the KSP.log, so it is
+	/// structured, survives sessions and opens in a spreadsheet.
 	/// </summary>
 	internal static class WeatherReportCsvWriter
 	{
@@ -44,11 +44,10 @@ namespace SituationalAwareness.WeatherReport
 		private static readonly Encoding Utf8WithBom = new UTF8Encoding(true);
 
 		/// <summary>
-		/// Appends one press (plus one row per layer) to the CSV. Returns
-		/// true only once the bytes are on disk, so the caller can confirm
-		/// on screen (user request 2026-09-14); an I/O failure is logged and
-		/// reported as false instead of escaping into the button callback,
-		/// where Unity would swallow it with no feedback at all.
+		/// Appends one press, plus one row per layer, to the CSV. Returns true
+		/// only once the bytes are on disk, so the caller can confirm on screen.
+		/// An I/O failure is logged and reported as false rather than escaping
+		/// into the button callback, where Unity would swallow it silently.
 		/// </summary>
 		internal static bool Write(string label, string note, WeatherSample sample)
 		{
@@ -114,10 +113,9 @@ namespace SituationalAwareness.WeatherReport
 		private static bool modsWritten;
 
 		/// <summary>
-		/// The loaded-plugins list (notes/indagine-meteo.md §8.2): names and
-		/// versions only, no paths, nothing else. One file per session, and
-		/// only once a report has actually been written — the disclaimer
-		/// promises nothing is read or written until the player reports.
+		/// The loaded-plugins list: names and versions only, no paths. Written
+		/// once per session, and only after a report has actually been made,
+		/// because the disclaimer promises nothing is written until then.
 		/// </summary>
 		private static void WriteInstalledModsOnce()
 		{
@@ -140,13 +138,11 @@ namespace SituationalAwareness.WeatherReport
 		}
 
 		/// <summary>
-		/// The file to append to. An existing report whose header predates the
-		/// current column set must NOT be appended to: the writer only emits a
-		/// header when it creates the file, so new wider rows would land under
-		/// an old narrower header and quietly produce a ragged CSV that no
-		/// spreadsheet or script reads correctly. When that happens the old file
-		/// is left untouched — it is collected data — and a numbered sibling is
-		/// started instead (weather-report-2.csv, -3, ...).
+		/// The file to append to. A report whose header predates the current
+		/// column set must NOT be appended to: a header is only emitted when the
+		/// file is created, so wider rows would land under a narrower header and
+		/// quietly produce a ragged CSV. The old file is left untouched, being
+		/// collected data, and a numbered sibling is started instead.
 		/// </summary>
 		private static string ResolveFilePath()
 		{
@@ -186,8 +182,8 @@ namespace SituationalAwareness.WeatherReport
 				{
 					string first = reader.ReadLine();
 					if (first == null) return true; // empty file: reusable as-is
-					// StreamReader normally eats the BOM itself; trimmed here too
-					// so a file written by some other tool still compares equal.
+					// StreamReader normally eats the BOM itself; trimmed here too,
+					// so a file written by another tool still compares equal.
 					return string.Equals(first.TrimStart('﻿'), expected, StringComparison.Ordinal);
 				}
 			}

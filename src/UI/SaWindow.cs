@@ -11,42 +11,37 @@ using UnityEngine.UI;
 namespace SituationalAwareness.UI
 {
 	/// <summary>
-	/// The single SA window (design doc §6): extended telemetry panel
-	/// (header/dial+data/footer) that doubles as the collapsed strip
-	/// (§6.7) — same window, toggled by double-clicking the header/strip,
-	/// never two separate windows. Shell (canvas, drag, hover focus-lock)
-	/// follows the KRAB/KRILL pattern.
+	/// The single SA window (design doc §6): an extended telemetry panel
+	/// (header, dial + data, footer) that doubles as the collapsed strip (§6.7).
+	/// One window toggled by double-clicking the header, never two.
 	/// </summary>
 	internal class SaWindow : MonoBehaviour
 	{
 		private const float ExtendedWidth = 430f;
 		private const float StripWidth = 430f;
-		// Named (bug fix, retest 2026-07-30): were magic numbers inline at
-		// each use, making it easy for DataCol's fixed width to silently
-		// drift out of sync with DialCol's if either changed independently.
+		// Named rather than inline, so the data column's fixed width cannot
+		// silently drift out of sync with the dial column's.
 		private const float DialColWidth = 138f;
 		private const float VDividerWidth = 1f;
 		private const string InputLockId = "SA_WINDOW";
 
-		// Strip weather block (2026-09-15): icon + external temperature,
-		// no name label and no severity badge — see BuildStrip/ApplyStrip.
+		// Strip weather block: icon plus external temperature, with no state name
+		// and no severity badge (see BuildStrip/ApplyStrip).
 		private GameObject stripWeatherGo;
 		private Image stripWeatherIcon;
 		private Text stripWeatherTemp;
 		private const double LowTempAlertC = 0.0;
 		private const double HighTempAlertC = 50.0;
-		// EXT TEMP now 3-tier (M3 restyling, user request): warn between
-		// HighTempAlertC and this, danger above it.
+		// EXT TEMP is 3-tier: warn between HighTempAlertC and this, danger above.
 		private const double VeryHighTempAlertC = 100.0;
-		// HULL TEMP color comes from the WORST part's T/maxTemp ratio, not
-		// an absolute temperature (design discussion 2026-07-26): 1500K is
-		// fine for a heat shield but already dangerous for a science
-		// experiment or control surface — only a relative threshold means
-		// the same thing for every part.
+		// HULL TEMP colour comes from the worst part's T/maxTemp ratio rather than
+		// an absolute temperature: 1500 K is fine for a heat shield and already
+		// fatal for a science part, so only a relative threshold means the same
+		// thing everywhere.
 		private const double HullWarnRatio = 0.6;
 		private const double HullDangerRatio = 0.8;
-		// 10 Hz (RealBattery precedent, user feedback 2026-07-19): fast
-		// enough to feel live, slow enough that decimal digits don't flicker.
+		// 10 Hz: fast enough to feel live, slow enough that decimals do not
+		// flicker.
 		private const float RefreshInterval = 0.1f;
 		private const string LockedBadgeColorHex = "#ff5c4d";
 
@@ -74,87 +69,59 @@ namespace SituationalAwareness.UI
 		private GameObject metRowGo;
 		private GameObject terminatorRowGo;
 		private GameObject coordinatesRowGo;
-		// Only meaningful in Surface mode (M3 restyling): with the
-		// terminator row moved up into the position group and PRESSURE/EXT
-		// TEMP reshuffled below, this divider stopped marking a real
-		// boundary in Orbit/TidalLock.
+		// Only marks a real boundary in Surface mode.
 		private GameObject positionDividerGo;
-		// Visible in any body-surface context — Surface OR TidalLock, never
-		// Orbit — AND only when the body has an atmosphere (M3 restyling;
-		// corrected 2026-07-27 twice: first to mode+body instead of a live
-		// vacuum reading, then to include TidalLock alongside Surface —
-		// confirmed with a real case, a GEP body tidally locked on its star
-		// AND atmospheric, matching mockup D). atmosphericTemperature reads
-		// a hardcoded constant in a vacuum (PhysicsGlobals.SpaceTemperature,
-		// verified on the decompiled FlightIntegrator.cs) so it's
-		// meaningless there — but the condition is deliberately mode+body,
-		// not "is the vessel currently reading zero pressure": if Surface
-		// mode is later extended to sub-orbital hops (design doc §9 M3
-		// point 4), a vessel briefly above the atmosphere but still in
-		// Surface mode must keep showing "4K"/"VACUUM", not blink the rows
-		// off. pressureRowGo shares this same visibility condition
-		// (see ApplyExtended's showAtmosphericRows). HULL TEMP (always
-		// visible) covers the vacuum/orbit case instead.
+		// Shown in any body-surface context (Surface or TidalLock, never Orbit)
+		// and only where the body has an atmosphere, since atmosphericTemperature
+		// reads a fixed constant in a vacuum. The condition is mode plus body
+		// rather than a live pressure reading on purpose: a vessel briefly above
+		// the atmosphere on a suborbital hop stays in Surface mode and must keep
+		// showing "VACUUM" instead of blinking the rows off. pressureRowGo shares
+		// it, and HULL TEMP covers the vacuum case instead.
 		private GameObject extTempRowGo;
 		private GameObject pressureRowGo;
-		// WEATHER (notes/indagine-meteo.md §3) lives in the LEFT column under
-		// the dial, not among the data rows: it is a state to glance at, not a
-		// number to read, and the icon needs room the value column does not
-		// have. Needs both an atmosphere and EVE volumetric clouds installed,
-		// so it has its own visibility rule on top of showAtmosphericRows — an
-		// install without EVE sees no section at all, not an empty one.
+		// WEATHER lives in the LEFT column under the dial rather than among the
+		// data rows: it is a state to glance at, not a number to read, and the
+		// icon needs room the value column has not. It needs both an atmosphere
+		// and EVE installed, so an install without EVE sees no section rather
+		// than an empty one.
 		private GameObject weatherSectionGo;
 		private Image weatherIcon;
 		private Text weatherLabel;
-		// Forecast line under the state (phase A, go 2026-09-10): secondary
-		// to the state on purpose — smaller, dimmer, lowercase, and separated
-		// from it by a blank line's worth of spacer. Both stay inactive when
-		// there is nothing to forecast, so the section keeps its height and
-		// stays centred in its half of the column.
+		// Forecast line under the state, deliberately secondary: smaller, dimmer,
+		// lowercase, a blank line away. Both parts stay inactive when there is
+		// nothing to forecast, so the section keeps its height and stays centred.
 		private GameObject weatherForecastSpacerGo;
 		private Text weatherForecastLabel;
-		// The badge always has the text glyph; the image is only there when an
-		// alert texture is installed, and only ever draws the "!" — the "?" of
-		// a science-locked section is always the font's (see SetWeatherBadge).
+		// The badge always carries the text glyph; the image is only present when
+		// an alert texture is installed, and only ever draws the "!".
 		private Image weatherBadgeImage;
 		private Text weatherBadgeText;
 		private string lastWeatherIconPath;
-		// Weather extension host (notes/indagine-meteo.md §8): a designated
-		// slot under the dial for external content — a survey companion's
-		// button row today, SA's own weather icon later. Bug fix (in-game
-		// test 2026-08-17): follows showAtmosphericRows exactly, same as
-		// EXT TEMP/PRESSURE — Surface/TidalLock AND the body has an
-		// atmosphere (weather/clouds are meaningless on an airless body),
-		// not just "not Orbit".
+		// Slot under the dial for a companion's own content. Follows
+		// showAtmosphericRows exactly, like EXT TEMP and PRESSURE.
 		private GameObject weatherHostGo;
-		// Surface mode only, hidden when the body IS the star (stellar
-		// dive exception, retest 2026-07-28): "sun elevation/azimuth" is
-		// meaningless when the vessel is at/in the light source itself.
+		// Surface mode only, and hidden when the body IS the star: sun elevation
+		// and azimuth mean nothing from inside the light source.
 		private GameObject sunRowGo;
-		// SOLAR TIME (M3 point 6, go 2026-07-28): cached from the last
-		// throttled refresh so Update()'s fast countdown-only path can
-		// rebuild the full 3-line dial sub-label without needing a full
-		// SaReadout — only the countdown itself needs per-frame freshness,
-		// see BuildSurfaceSubText's doc comment.
+		// Cached from the last throttled refresh, so Update()'s fast
+		// countdown-only path can rebuild the whole dial sub-label without a full
+		// SaReadout (see BuildSurfaceSubText).
 		private double lastDayProgress01;
 		private int lastSolarHour, lastSolarMinute, lastSolarSecond;
 		private double lastEquationOfTimeSec;
 		private double lastSolarDayLengthSec;
-		// KSC's timezone VALUE is fixed for the whole session (its
-		// coordinates are set once at game load — SpaceCenter.Instance never
-		// moves without a restart, notes/verifiche-api.md M1 addendum), so
-		// it's computed once. The label TEXT built from it is rebuilt every
-		// refresh regardless (M3 restyling: whether it's even shown now
-		// also depends on mode/home-body, see UpdateKscRow).
+		// The KSC's timezone VALUE is fixed for the session, its coordinates
+		// being set once at game load, so it is computed once. The label built
+		// from it is rebuilt every refresh, since whether it shows at all depends
+		// on mode and body (see UpdateKscRow).
 		private int? kscTimeZoneCached;
 
 		public static void Open()
 		{
 			if (current != null) return;
-			// Safety net (2026-07-22, home-clock drift investigation):
-			// re-anchor every cached body's mean-time offset every time the
-			// window opens, so any residual drift accumulated since the
-			// last open never grows past "one open-to-open interval".
+			// Re-anchor every cached body's mean-time offset on each open, so any
+			// residual drift never grows past one open-to-open interval.
 			MeanTimeCalibration.Reset();
 			GameObject host = new GameObject("SaWindow");
 			current = host.AddComponent<SaWindow>();
@@ -197,12 +164,10 @@ namespace SituationalAwareness.UI
 			canvas.sortingOrder = 900;
 			scaler = gameObject.AddComponent<CanvasScaler>();
 			scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
-			// SA's own scale (retest 2026-07-27, "+50%, regolabile?") stacks on
-			// top of the stock UI Scale rather than replacing it — ConstantPixelSize
-			// + scaleFactor is a pixel-perfect canvas multiplier, no Transform-scale
-			// blur regardless of the value. Re-synced each refresh tick in
-			// FixedUpdate so a change made in the settings dialog takes effect
-			// without reopening the window.
+			// SA's own scale stacks on top of the stock UI Scale rather than
+			// replacing it. ConstantPixelSize + scaleFactor is a pixel-perfect
+			// canvas multiplier, so no value blurs the text. Re-synced every
+			// refresh tick, so a change in the settings dialog lands at once.
 			scaler.scaleFactor = GameSettings.UI_SCALE * SaParams.UiScale;
 			gameObject.AddComponent<GraphicRaycaster>();
 
@@ -221,10 +186,8 @@ namespace SituationalAwareness.UI
 			shellHost = SaUi.Go("Shell", windowRect).transform;
 			SaUi.Vertical(shellHost.gameObject, 0, 0f);
 
-			// F2 hide-UI (bug fix — a custom overlay Canvas MUST honor this,
-			// standard KSP-modding requirement) + pause-menu overlap are two
-			// different triggers for the same "hide our canvas" outcome —
-			// see Update().
+			// A custom overlay Canvas must honour F2; that and the pause menu are
+			// two triggers for the same "hide our canvas" outcome (see Update).
 			GameEvents.onHideUI.Add(OnHideUI);
 			GameEvents.onShowUI.Add(OnShowUI);
 
@@ -252,20 +215,18 @@ namespace SituationalAwareness.UI
 		{
 			float oldHeight = windowRect.rect.height;
 
-			// DestroyImmediate, not Destroy: we need the old children truly
-			// gone (not just scheduled for end-of-frame cleanup) before the
-			// forced layout rebuild below, or it would measure stale content
-			// still present in the hierarchy and mis-size the compensation.
+			// DestroyImmediate, not Destroy: the old children must be gone, not
+			// merely scheduled for end-of-frame cleanup, before the forced layout
+			// rebuild below measures the hierarchy.
 			for (int i = shellHost.childCount - 1; i >= 0; i--)
 			{
 				DestroyImmediate(shellHost.GetChild(i).gameObject);
 			}
 			valueLabels.Clear();
 			dial = null;
-			// The kscTime row's label Text is about to be destroyed and
-			// rebuilt from scratch (bare "KSC", no TZ) below — the cached
-			// TZ *value* doesn't need recomputing, but the flag must reset
-			// so UpdateKscRow re-applies it to the new Text object once.
+			// The KSC row's label is about to be rebuilt bare, without its TZ
+			// suffix. The cached value needs no recomputing, but the flag must
+			// reset so UpdateKscRow re-applies it to the new Text once.
 			kscTimeZoneCached = null;
 			windowRect.sizeDelta = new Vector2(SaPersist.Collapsed ? StripWidth : ExtendedWidth, windowRect.sizeDelta.y);
 
@@ -281,11 +242,10 @@ namespace SituationalAwareness.UI
 			}
 			lastMode = (SaMode)(-1);
 
-			// Bug fix (test M2, fase 2): toggling collapsed<->extended used to
-			// recenter the whole window instead of keeping the titlebar/strip
-			// at a fixed height. Pivot (0.5,0.5) means a height change shifts
-			// both edges symmetrically unless compensated — force the layout
-			// NOW (not next frame) so the new height is known synchronously.
+			// With a centred pivot a height change moves both edges, so collapsing
+			// would recentre the window instead of keeping the titlebar put. Force
+			// the layout NOW, not next frame, so the new height is known
+			// synchronously and can be compensated for.
 			LayoutRebuilder.ForceRebuildLayoutImmediate(windowRect);
 			if (preserveTopEdge)
 			{
@@ -312,9 +272,8 @@ namespace SituationalAwareness.UI
 			chipLabel = SaUi.Label(chipBack, "-", 9, SaUi.Cyan, TextAnchor.MiddleCenter);
 			SaUi.Stretch(chipLabel.rectTransform);
 
-			// Led LAST (bug fix: it had drifted to the front, mockup has it
-			// trailing) and round via SaVectorDot (bug fix: was a plain
-			// square Image).
+			// Led last in the row, and round via SaVectorDot rather than a square
+			// Image.
 			ledDotExtended = NewLedDot(bar);
 
 			AttachDrag(bar);
@@ -338,55 +297,40 @@ namespace SituationalAwareness.UI
 			GameObject body = SaUi.Go("Body", shellHost);
 			SaUi.Horizontal(body, 0, 0);
 
-			// No frame on the dial (M3 restyling, mockup reconciliation):
-			// plain Go(), not Bordered() — the window's own panel color
-			// already shows through underneath (same fill color), only the
-			// border outline is gone.
+			// Plain Go(), not Bordered(): the window's own panel colour shows
+			// through underneath, so the dial has no frame of its own.
 			GameObject dialCol = SaUi.Go("DialCol", body.transform);
-			// flexibleHeight so the column fills the body row rather than
-			// hugging its own content: the two halves below can only share
-			// leftover space if there IS leftover space, and the row's height
-			// is set by the (much taller) data column next to it.
+			// flexibleHeight so the column fills the body row rather than hugging
+			// its content: the two halves below can only share leftover space if
+			// there is any, and the row's height comes from the data column.
 			SaUi.Size(dialCol, DialColWidth, -1f).flexibleHeight = 1f;
-			// A little more breathing room between the dial graphic and the
-			// phase/sub labels below it (retest 2026-07-30, user request) —
-			// this VerticalLayoutGroup's spacing is the ONLY thing
-			// controlling that gap, and it's shared by all three modes by
-			// construction (Surface/Orbit/TidalLock all reuse the same
-			// dialCol), so there's no per-mode drift to worry about here.
+			// This group's spacing is the only thing setting the gap between the
+			// dial graphic and the labels below it, and all three modes reuse the
+			// same dialCol, so there is no per-mode drift.
 			SaUi.Vertical(dialCol, 10, 8f);
 
-			// Vertical divider dial<->data, full height of the body row
-			// (M3 restyling) — a sibling in this same HorizontalLayoutGroup,
-			// so it's excluded from header/footer by construction.
+			// Vertical divider between dial and data, a sibling in this same
+			// HorizontalLayoutGroup so header and footer are excluded from it.
 			Image vDivider = SaUi.Panel_("VDivider", body.transform, SaUi.PanelEdge);
 			LayoutElement vDividerLe = SaUi.Size(vDivider.gameObject, VDividerWidth, -1f);
 			vDividerLe.flexibleHeight = 1f;
 
 			GameObject dataCol = SaUi.Go("DataCol", body.transform);
-			// Fixed width, NOT auto/content-driven (bug fix, retest
-			// 2026-07-30): with no explicit preferredWidth, this column's
-			// layout size deferred to its children's own preferred width —
-			// which, for clockMain's Text, scales with the STRING LENGTH.
-			// A long "T−..." countdown could nudge dataCol's computed
-			// preferred size around, visually reflowing the row it shares
-			// with clockSub even though the outer window itself never
-			// resizes (only its ContentSizeFitter's verticalFit is set).
-			// Explicit width removes that dependency entirely.
+			// Fixed width, never content-driven: without an explicit preferredWidth
+			// the column would defer to its children, and the clock Text's
+			// preferred width scales with the STRING LENGTH, so a long countdown
+			// would reflow the row it shares with the sub-label.
 			SaUi.Size(dataCol, ExtendedWidth - DialColWidth - VDividerWidth, -1f, 1f);
-			// Horizontal padding moved OFF the column and onto each row
-			// instead (M3 restyling, "layout a tabella"): dividers need to
-			// bleed to the column's true left/right edges, which only works
-			// if the column itself carries no horizontal padding of its own
-			// — vertical padding (12) stays here, shared by every row.
+			// Horizontal padding lives on each row, not here: dividers must bleed
+			// to the column's true edges, which only works while the column itself
+			// carries none. The vertical padding stays, shared by every row.
 			VerticalLayoutGroup dataColGroup = SaUi.Vertical(dataCol, 0, 6f);
 			dataColGroup.padding = new RectOffset(0, 0, 12, 12);
 
-			// Two equal halves, each centring its own content vertically (user
-			// request 2026-09-09): the dial above, weather below. Equal
-			// flexibleHeight splits whatever the data column leaves over, and
-			// MiddleCenter alignment keeps each block in the middle of its own
-			// half instead of both piling up at the top.
+			// Two equal halves, dial above and weather below, each centring its own
+			// content: equal flexibleHeight splits whatever the data column leaves
+			// over, and MiddleCenter keeps each block in the middle of its half
+			// rather than both piling up at the top.
 			GameObject dialHalf = SaUi.Go("DialHalf", dialCol.transform);
 			SaUi.Vertical(dialHalf, 0, 8f).childAlignment = TextAnchor.MiddleCenter;
 			SaUi.Size(dialHalf, -1f, -1f).flexibleHeight = 1f;
@@ -396,21 +340,14 @@ namespace SituationalAwareness.UI
 			SaUi.Size(weatherHalf, -1f, -1f).flexibleHeight = 1f;
 
 			dial = SaDial.Build(dialHalf.transform);
-			// SOLAR TIME's click-to-cycle (M3 point 6, go 2026-07-28): the
-			// dial's phase/sub area isn't a data row, so it has no built-in
-			// click handling — same ClickCatcher used by AddClickableRow,
-			// just attached directly to the dial's labels area instead.
+			// The dial's phase/sub area is not a data row and has no click handling
+			// of its own, so it gets the same ClickCatcher AddClickableRow uses.
 			SaUi.ClickCatcher(dial.labelsArea, CycleSolarTimeFormat);
 
-			// Weather extension host (notes/indagine-meteo.md §8): dialCol's
-			// dedicated lower section — the dial (built above) is the upper
-			// one. Bug fix (in-game test 2026-08-18): a plain SaUi.Go() has
-			// no ContentSizeFitter, so it never reported its populated
-			// children's real height back to dialCol's own VerticalLayoutGroup
-			// and just overlapped the dial above it. Own Vertical+ContentSizeFitter
-			// (same "hug my children" pattern as windowRect in Build()) makes
-			// it collapse to true zero height when empty (no companion
-			// subscribed) and size correctly once one populates it.
+			// The companion slot needs its own Vertical + ContentSizeFitter: a
+			// plain Go() would never report its children's height back to dialCol
+			// and would overlap the dial above. With them it collapses to zero
+			// when empty and sizes correctly once a companion populates it.
 			BuildWeatherSection(weatherHalf.transform);
 
 			weatherHostGo = SaUi.Go("WeatherHost", weatherHalf.transform);
@@ -419,9 +356,7 @@ namespace SituationalAwareness.UI
 			SaExtensionPoint.Raise(weatherHostGo.transform);
 
 			BuildRows(dataCol.transform);
-			// Divider before the timeline (M3 restyling, mockup
-			// reconciliation) — previously the timeline ran straight into
-			// the last data row with no visual break.
+			// Divider, so the timeline does not run straight into the last row.
 			SaUi.Divider(dataCol.transform);
 			SaDial.BuildTimeline(dial, dataCol.transform);
 		}
@@ -445,64 +380,52 @@ namespace SituationalAwareness.UI
 			SaUi.Divider(parent);
 			coordinatesRowGo = AddClickableRow(parent, "#LOC_SA_row_coordinates", "coordinates", CycleCoordUnit);
 			AddDataRow(parent, "#LOC_SA_row_biome", "biome");
-			// Moved up from the environment group below (M3 restyling,
-			// mockup D reconciliation): sits right under BIOME, in the
-			// position block, not down with SUN/FLUX/GRAVITY.
+			// Belongs to the position block, under BIOME, not down with SUN/FLUX.
 			terminatorRowGo = AddClickableRow(parent, "#LOC_SA_row_terminator", "terminator", CycleTerminatorUnit);
 
-			// Surface-only (M3 restyling, see positionDividerGo doc comment
-			// at the field declaration) — toggled in FixedUpdate's
-			// mode-change block.
+			// Surface-only, toggled in FixedUpdate's mode-change block.
 			positionDividerGo = SaUi.Divider(parent);
 
-			// sunRowGo, not just SetRow text (retest 2026-07-28, stellar
-			// dive exception): "sun elevation/azimuth" is meaningless when
-			// the vessel IS at/in the star itself — hidden entirely rather
-			// than "—", same treatment as EXT TEMP/PRESSURE (a structural,
-			// per-body fact, not a transient numerical edge case).
+			// The whole row is hidden rather than dashed out when the vessel is at
+			// the star itself: a structural per-body fact, like EXT TEMP/PRESSURE,
+			// not a transient numerical edge case.
 			sunRowGo = AddDataRow(parent, "#LOC_SA_row_sun", "sun");
 			AddDataRow(parent, "#LOC_SA_row_flux", "flux");
-			// HULL TEMP before EXT TEMP (test M3 retest, reordered
-			// 2026-07-27) — always-visible row leads, the conditionally-
-			// hidden one follows.
+			// The always-visible row leads, the conditionally hidden one follows.
 			AddClickableRow(parent, "#LOC_SA_row_hullTemp", "hullTemp", CycleTempUnit);
-			// Same click-cycle action as HULL TEMP on purpose (design
-			// discussion 2026-07-26): one shared unit for both rows, never
-			// one in °C and the other in K.
+			// Same click action as HULL TEMP on purpose: one shared unit for both
+			// rows, never one in °C and the other in K.
 			extTempRowGo = AddClickableRow(parent, "#LOC_SA_row_temperature", "temperature", CycleTempUnit);
-			// Follows EXT TEMP's visibility now (user correction 2026-07-27,
-			// see pressureRowGo doc comment).
+			// Shares EXT TEMP's visibility condition.
 			pressureRowGo = AddClickableRow(parent, "#LOC_SA_row_pressure", "pressure", CyclePressureUnit);
 			AddClickableRow(parent, "#LOC_SA_row_gravity", "gravity", CycleGravityUnit);
 		}
 
 		/// <summary>
-		/// The WEATHER section: dialCol's lower half, under the dial. A divider,
-		/// then a tinted icon with the state name beneath it, plus a small
-		/// top-right slot an external companion can drop a button into.
+		/// The WEATHER section in the dial column's lower half: a tinted icon with
+		/// the state name beneath it, plus a small top-right slot a companion can
+		/// drop a button into.
 		///
-		/// The whole thing collapses to nothing when there is no weather to
-		/// report (see ApplyExtended) so an airless body — or an install with no
-		/// EVE — loses the section entirely rather than showing a dead label.
+		/// It collapses to nothing when there is no weather to report (see
+		/// ApplyExtended), so an airless body — or an install with no EVE — loses
+		/// the section rather than showing a dead label.
 		/// </summary>
 		private void BuildWeatherSection(Transform parent)
 		{
-			// Cleared because the Image below is a NEW object every rebuild
-			// (collapse toggle, window re-open) while this field is not: left
-			// stale, the "same path as last time" shortcut in SetWeatherSection
-			// would skip assigning the sprite and the icon would silently
-			// vanish after the first toggle.
+			// The Image below is a new object on every rebuild while this field is
+			// not: left stale, the "same path as last time" shortcut in
+			// SetWeatherSection would skip assigning the sprite and the icon would
+			// vanish after the first collapse toggle.
 			lastWeatherIconPath = null;
 
 			weatherSectionGo = SaUi.Go("WeatherSection", parent);
 			SaUi.Vertical(weatherSectionGo, 0, 3f);
 			weatherSectionGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-			// No divider and no "WEATHER" caption above the icon (user request,
-			// test 2026-09-11): the icon under the dial reads as weather on its
+			// No divider and no caption above the icon: it reads as weather on its
 			// own, and the line was one more edge in an already busy column.
-			// #LOC_SA_row_weather is kept in the loc files, commented out, in
-			// case the caption ever comes back.
+			// #LOC_SA_row_weather stays in the loc files, commented out, in case
+			// the caption ever comes back.
 
 			// The icon needs a box of its OWN size, not a full-width row: the
 			// alert badge anchors to that box's bottom-left corner, and with
@@ -530,9 +453,9 @@ namespace SituationalAwareness.UI
 			ContentSizeFitter labelFitter = weatherLabel.gameObject.AddComponent<ContentSizeFitter>();
 			labelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-			// Forecast: a spacer standing in for the blank line the user asked
-			// for (a literal "\n" would make the label's own height lie to the
-			// layout), then the sentence itself, two points smaller and dim.
+			// Forecast: a spacer standing in for a blank line, since a literal
+			// "\n" would make the label's own height lie to the layout; then the
+			// sentence itself, two points smaller and dim.
 			weatherForecastSpacerGo = SaUi.Go("ForecastSpacer", weatherSectionGo.transform);
 			SaUi.Size(weatherForecastSpacerGo, -1f, WeatherForecastSpacerHeight);
 			weatherForecastSpacerGo.SetActive(false);
@@ -545,13 +468,10 @@ namespace SituationalAwareness.UI
 
 			// Companion slot: anchored to the section's top-right corner and
 			// excluded from the layout group, so whatever an external DLL puts
-			// here floats over the section instead of pushing the icon down,
-			// and the companion can switch it on and off without moving
-			// anything. It spent one test (2026-09-11) in the footer, where
-			// it read as a stray brown square and shifted the footer text;
-			// the section now stays visible (as UNKNOWN) whenever the report
-			// is on, so the slot no longer needs to outlive it — see
-			// ApplyExtended.
+			// here floats over the section instead of pushing the icon down, and
+			// can be switched on and off without moving anything. The section
+			// itself stays visible as UNKNOWN whenever the report is on (see
+			// ApplyExtended), so the slot never needs to outlive it.
 			GameObject corner = SaUi.Go("WeatherCorner", weatherSectionGo.transform);
 			corner.AddComponent<LayoutElement>().ignoreLayout = true;
 			RectTransform cornerRect = corner.GetComponent<RectTransform>();
@@ -564,11 +484,9 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// The severity mark in the icon's bottom-left corner. Prefers a
-		/// dedicated texture (SA_weather_alert) if one is installed — weather
-		/// apps use a rounder exclamation mark than a text font gives — and
-		/// falls back to a bold "!" from SA's own font when it is absent, so
-		/// the feature works before the art exists.
+		/// The severity mark in the icon's bottom-left corner: a dedicated
+		/// SA_weather_alert texture when one is installed, otherwise a bold "!"
+		/// from SA's own font, so the feature works before the art exists.
 		/// </summary>
 		private void BuildWeatherBadge(Transform iconTransform)
 		{
@@ -587,12 +505,10 @@ namespace SituationalAwareness.UI
 				weatherBadgeImage.sprite = sprite;
 				weatherBadgeImage.preserveAspect = true;
 			}
-			// Plain bold glyph from SA's own font, no outline. Magnified it
-			// looks like it fights the icon's strokes, but at the real 32px
-			// it reads cleanly — chosen on the rendered comparison (user,
-			// 2026-09-09), not on the zoomed-in view. Always built: even with
-			// an alert texture installed, the "?" of a locked section is
-			// drawn from here.
+			// Plain bold glyph from SA's own font, no outline: it fights the
+			// icon's strokes when magnified but reads cleanly at the real 32px.
+			// Always built, since even with an alert texture installed a locked
+			// section's "?" is drawn from here.
 			weatherBadgeText = SaUi.Label(badge.transform, "!", 13, SaUi.Warn,
 				TextAnchor.MiddleCenter, FontStyle.Bold);
 			SaUi.Stretch(weatherBadgeText.rectTransform);
@@ -600,16 +516,18 @@ namespace SituationalAwareness.UI
 		}
 
 		private const float WeatherIconSize = 32f;
-		/// <summary>Strip's own weather icon, smaller than the extended widget's 32px (2026-09-15): the strip row is 22px of content inside a 30px bar, same size class as the mini-dial's 22px-tall icon box.</summary>
+		/// <summary>The strip's own weather icon, smaller than the extended
+		/// widget's: the strip row is 22px of content inside a 30px bar, the same
+		/// size class as the mini-dial's icon box.</summary>
 		private const float StripWeatherIconSize = 18f;
 		private const float StripWeatherTempWidth = 62f;
 		private const float WeatherForecastSpacerHeight = 6f;
 		private const float WeatherBadgeSize = 13f;
 		private const float WeatherCornerSize = 14f;
 
-		// Left/right padding every row applies to itself now that dataCol's
-		// own horizontal padding is zero (M3 restyling) — dividers (built
-		// directly against dataCol, no row wrapper) bleed to the true edges.
+		// Left/right padding every row applies to itself, dataCol's own being
+		// zero; dividers are built directly against dataCol with no row wrapper,
+		// so they bleed to the true edges.
 		private static readonly RectOffset RowPadding = new RectOffset(12, 12, 0, 0);
 
 		private GameObject AddDataRow(Transform parent, string labelKey, string id)
@@ -623,8 +541,8 @@ namespace SituationalAwareness.UI
 			Text v = SaUi.Label(row.transform, "-", 10, SaUi.Text, TextAnchor.MiddleRight);
 			SaUi.Size(v.gameObject, -1f, 14f, 1f);
 			valueLabels["row_" + id] = v;
-			// Stashed for rows whose LABEL needs a per-session update (only
-			// "kscTime" today — the timezone appended once, see UpdateKscRow).
+			// Stashed for rows whose LABEL needs a per-session update: only
+			// "kscTime" today, whose timezone is appended once (see UpdateKscRow).
 			valueLabels["row_" + id + "_label"] = k;
 			return row;
 		}
@@ -666,50 +584,40 @@ namespace SituationalAwareness.UI
 			SaUi.Size(bar.gameObject, -1f, 30f);
 			SaUi.Horizontal(bar.gameObject, 8, 8f);
 
-			// Mini-dial FIRST (design doc §6.7, mockup B1/B2/B3 — implemented
-			// 2026-07-25): a static generic icon stood in this spot for the
-			// whole M2 cycle (registered placeholder, never a real dial).
+			// Mini-dial first (design doc §6.7).
 			stripDial = SaDial.BuildStripIcon(bar);
 
-			// Natural width, not a fixed 90px slot (bug fix, M3 restyling:
-			// the leftover gap when the actual text was shorter than 90px
-			// read as "too much space after the clock" — one of two causes
-			// of the uneven spacing the user reported).
+			// Natural width, not a fixed slot: a fixed one leaves a gap after the
+			// clock whenever the text comes out shorter.
 			stripHot = SaUi.Label(bar, "-", 16, SaUi.Amber, TextAnchor.MiddleLeft);
 			SaUi.Size(stripHot.gameObject, -1f, 22f);
 
-			// Local date/Sol, cyan, Surface-only (M3 restyling, mockup B1
-			// reconciliation) — same dateLine concept as the extended view,
-			// toggled active in ApplyStrip.
+			// Local date/Sol, Surface-only: the extended view's dateLine, toggled
+			// active in ApplyStrip.
 			stripDate = SaUi.Label(bar, "-", 10, SaUi.Cyan, TextAnchor.MiddleLeft);
 			SaUi.Size(stripDate.gameObject, -1f, 22f);
 
 			stripPhase = SaUi.Label(bar, "-", 10, SaUi.Text, TextAnchor.MiddleLeft);
 			SaUi.Size(stripPhase.gameObject, -1f, 22f);
 
-			// Single flexible spacer (bug fix, M3 restyling): replaces the
-			// flexibleWidth that used to live on stripPhase — with that
-			// removed, phase sits snug against its neighbors like every
-			// other element, and this one dedicated spacer is the only
-			// thing pushing tail+led to the right (mockup's "margin-left:
-			// auto" on the tail alone, not a stretchy middle element).
+			// One dedicated spacer rather than flexibleWidth on stripPhase: every
+			// element then sits snug against its neighbours, and this is the only
+			// thing pushing tail and led to the right.
 			GameObject stripSpacer = SaUi.Go("Spacer", bar);
 			SaUi.Size(stripSpacer, 0f, -1f, 1f);
 
-			// Weather icon + external temperature (2026-09-15, user request):
-			// right before stripTail, inside the bar's own 8px spacing, so a
-			// hidden block leaves no gap and a shown one still reads as its
-			// own group rather than crowding the "next event" text. No name
-			// label and no severity badge here — see SaWeatherVisibility for
-			// the shared show/hide/lock rule with the extended widget.
+			// Weather icon + external temperature, after the spacer so a hidden
+			// block leaves no gap and a shown one reads as its own group instead
+			// of crowding the "next event" text. No state name and no severity
+			// badge here; SaWeatherVisibility holds the show/hide/lock rule this
+			// shares with the extended widget.
 			stripWeatherGo = SaUi.Go("Weather", bar);
 			SaUi.Horizontal(stripWeatherGo, 0, 4f, TextAnchor.MiddleCenter);
 			SaUi.Size(stripWeatherGo, -1f, 22f);
 
-			// Temperature first, icon last (user request 2026-09-18). Fixed
-			// width + right alignment so the figure's right edge, and with it
-			// the icon, never shifts as digits come and go ("9.9" to "-12.3",
-			// "1,234.5 K"); sized for the longest expected text.
+			// Temperature first, icon last. Fixed width and right alignment so the
+			// figure's right edge, and with it the icon, never shifts as digits
+			// come and go; sized for the longest expected text.
 			stripWeatherTemp = SaUi.Label(stripWeatherGo.transform, "-", 10, SaUi.Text, TextAnchor.MiddleRight);
 			SaUi.Size(stripWeatherTemp.gameObject, StripWeatherTempWidth, 22f);
 
@@ -719,15 +627,14 @@ namespace SituationalAwareness.UI
 			stripWeatherIcon.preserveAspect = true;
 			stripWeatherIcon.enabled = false;
 
-			// Starts hidden like every other conditional strip element
-			// (stripDate, the mode-specific branches in ApplyStrip): nothing
-			// classified yet on the very first frame.
+			// Starts hidden like every other conditional strip element: nothing is
+			// classified yet on the first frame.
 			stripWeatherGo.SetActive(false);
 
 			stripTail = SaUi.Label(bar, "-", 10, SaUi.TextDim, TextAnchor.MiddleRight);
 			SaUi.Size(stripTail.gameObject, -1f, 22f);
 
-			// Led LAST here too (bug fix: was first, mockup B1/B2/B3 has it trailing).
+			// Led last here too, trailing the row.
 			ledDotStrip = NewLedDot(bar);
 
 			AttachDrag(bar);
@@ -737,24 +644,15 @@ namespace SituationalAwareness.UI
 		// --------------------------------------------------------------- tick
 
 		/// <summary>
-		/// Visibility, every rendered frame (cheap, needs to feel instant):
-		/// F2 hide-UI and the pause menu (Esc) both hide our canvas — bugs
-		/// found in test M2 (fase 3, "critiche"): SA had no onHideUI/
-		/// onShowUI hook at all, and rendered ON TOP of the pause menu
-		/// because nothing ever hid it. PauseMenu.isOpen is a plain public
-		/// static bool (verified on the decompiled source), cheap to poll —
-		/// no event to hook, only a live property.
+		/// Visibility, every rendered frame, since it has to feel instant: F2 and
+		/// the pause menu both hide the canvas. PauseMenu.isOpen is a public
+		/// static bool with no event behind it, so it is polled rather than hooked.
 		///
-		/// Orbit timer refresh also lives here, not FixedUpdate (retest
-		/// 2026-07-28: still felt throttled from FixedUpdate — physics
-		/// ticks and rendered frames aren't the same cadence, and what the
-		/// player actually perceives is the rendered frame). Update() is
-		/// the closest thing to "real time" a UI text field can have: once
-		/// per rendered frame, uncapped by any accumulator. The underlying
-		/// physics state (vessel position/velocity, orbit.period) only
-		/// changes at the physics tick rate regardless of where we read it
-		/// from, so reading it here loses nothing and can only refresh the
-		/// displayed text sooner.
+		/// The orbit timer refreshes here rather than in FixedUpdate: physics ticks
+		/// and rendered frames are not the same cadence, and the rendered frame is
+		/// what the player perceives. The underlying state only changes at the
+		/// physics rate wherever it is read, so reading it here loses nothing and
+		/// can only show the new value sooner.
 		/// </summary>
 		private void Update()
 		{
@@ -779,16 +677,12 @@ namespace SituationalAwareness.UI
 				}
 			}
 
-			// SOLAR TIME's alba/tramonto countdown (M3 point 6, go
-			// 2026-07-28: same "will 10Hz keep up with a fast-moving
-			// vessel" concern already solved for the orbit timer above —
-			// exact longitude changes continuously, so this needs the same
-			// unthrottled treatment). Only in extended Surface mode, only
-			// when the toggle is actually on and the row isn't itself
-			// overridden by the stellar-dive/near-pole exceptions (cheap
-			// re-checks here, not a full readout rebuild). day%/solar-clock
-			// digits reuse the last throttled values — see BuildClockAndPhase,
-			// only the countdown itself needs per-frame freshness.
+			// SOLAR TIME's sunrise/sunset countdown, unthrottled for the same
+			// reason as the orbit timer above: exact longitude changes
+			// continuously. Only in extended Surface mode, only with the toggle on
+			// and the row not overridden by the stellar-dive or near-pole cases —
+			// cheap re-checks, not a full readout rebuild. The day percentage and
+			// clock digits reuse the last throttled values.
 			if (visible && !SaPersist.Collapsed && lastMode == SaMode.Surface && SaParams.ShowSolarTime && dial.subLabel != null)
 			{
 				Vessel v = FlightGlobals.ActiveVessel;
@@ -804,21 +698,15 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Data refresh, tied to FixedUpdate + a 10 Hz accumulator (bug fix,
-		/// test M2 fase 0/9): Planetarium.time — and therefore UT — only
-		/// advances inside FixedUpdate (verified on the decompiled
-		/// Planetarium.cs: `time += fixedDeltaTime * timeScale` lives in
-		/// FixedUpdate, not Update). Sampling it from a rendered-frame
-		/// Update() meant re-reading the same frozen value across several
-		/// frames then jumping all at once — sampling here instead means we
-		/// only ever look at UT exactly when the game itself just moved it.
-		/// The accumulator on top caps the actual redraw to ~10/s (RealBattery
-		/// precedent), independent of the physics tick rate.
+		/// Data refresh, on FixedUpdate plus a 10 Hz accumulator: Planetarium.time,
+		/// and therefore UT, only advances inside FixedUpdate. Sampling it from a
+		/// rendered frame would re-read the same frozen value several times and
+		/// then jump; sampling here looks at UT exactly when the game moved it.
+		/// The accumulator caps the redraw at ~10/s, whatever the physics rate.
 		/// </summary>
 		private void FixedUpdate()
 		{
-			// Orbit timer's own unthrottled refresh now lives in Update()
-			// (retest 2026-07-28), not here — see that method's doc comment.
+			// The orbit timer's unthrottled refresh lives in Update(), not here.
 			refreshAccumulator += Time.fixedDeltaTime;
 			if (refreshAccumulator < RefreshInterval) return;
 			refreshAccumulator = 0f;
@@ -839,8 +727,7 @@ namespace SituationalAwareness.UI
 				{
 					terminatorRowGo.SetActive(lastMode == SaMode.TidalLock);
 				}
-				// Surface-only (M3 restyling, see positionDividerGo field
-				// doc comment).
+				// Surface-only, see the positionDividerGo field.
 				if (!SaPersist.Collapsed && positionDividerGo != null)
 				{
 					positionDividerGo.SetActive(lastMode == SaMode.Surface);
@@ -848,9 +735,8 @@ namespace SituationalAwareness.UI
 			}
 			if (!SaPersist.Collapsed && metRowGo != null)
 			{
-				// Checked every refresh, not just on mode change: the player
-				// can flip the "show MET" setting mid-flight from the
-				// difficulty dialog while the window stays open.
+				// Checked every refresh, not only on a mode change: the setting can
+				// be flipped mid-flight while the window stays open.
 				metRowGo.SetActive(SaParams.ShowMissionTime);
 			}
 
@@ -873,15 +759,10 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// TZ shown ONLY in Surface mode on the home body (M3 restyling,
-		/// user correction 2026-07-26 — the earlier "always show TZ" was
-		/// backwards: the default is hidden, the home-body-surface case is
-		/// the exception). The TZ VALUE itself is still cached once
-		/// (kscTimeZoneCached — genuinely session-stable, KSC's coordinates
-		/// don't move), but the LABEL TEXT is now rebuilt every refresh
-		/// since it depends on the current mode too, not just a one-time
-		/// value — cheap (a string concat at 10 Hz), same reasoning as the
-		/// hull-temperature computation.
+		/// The TZ suffix shows only in Surface mode on the home body; hidden is
+		/// the default. Its value is cached once, the KSC's coordinates being
+		/// session-stable, but the label text is rebuilt every refresh because it
+		/// also depends on the current mode — a string concat at 10 Hz.
 		/// </summary>
 		private void UpdateKscRow(SaReadout r)
 		{
@@ -906,9 +787,8 @@ namespace SituationalAwareness.UI
 
 		private void ApplyExtended(SaReadout r)
 		{
-			// "SA //" dim, vessel name appended (M3 restyling, mockup
-			// reconciliation) — rich text span, base color (set once at
-			// BuildHeader time) stays the fallback for the un-tagged part.
+			// A rich-text span dims the "SA //" prefix; the label's own colour,
+			// set once at build time, covers the un-tagged remainder.
 			titleLabel.text = "<color=#" + SaUi.TextDimHex + ">SA //</color> "
 				+ r.BodyName.ToUpperInvariant() + " · " + r.VesselName;
 			chipLabel.text = Loc(ChipKey(r.Mode));
@@ -925,10 +805,8 @@ namespace SituationalAwareness.UI
 			SetRow("met", "T+" + FormatMet(r.MissionTime));
 
 			SetRow("coordinates", FormatCoordinates(r.Latitude, r.Longitude));
-			// DMS is much wider than decimal (bug fix, test M2 retest: it
-			// was overflowing sideways instead of growing the row) — switch
-			// to a 2-line stacked value and grow the row's height instead of
-			// its width, which disturbs the fixed-width dial column less.
+			// DMS is much wider than decimal, so it stacks onto two lines and grows
+			// the row's height instead of overflowing sideways.
 			if (coordinatesRowGo != null)
 			{
 				LayoutElement coordLe = coordinatesRowGo.GetComponent<LayoutElement>();
@@ -938,64 +816,43 @@ namespace SituationalAwareness.UI
 				}
 			}
 			SetRow("biome", r.BiomeName);
-			// Stellar dive exception (retest 2026-07-28): SUN row hidden
-			// when the body IS the star — "elevation of the sun" is
-			// meaningless when the vessel is at/in the light source itself.
+			// The SUN row hides when the body IS the star: an elevation of the sun
+			// means nothing from inside the light source.
 			bool onStarSurface = r.Mode == SaMode.Surface && r.BodyIsStar;
 			if (sunRowGo != null) sunRowGo.SetActive(!onStarSurface);
 			if (!onStarSurface)
 			{
-				// "EL"/"AZ" labels (M3 restyling, mockup reconciliation) —
-				// orbit has no azimuth (design doc §4.2, sub-vessel point only).
-				// Near a pole (M3 point 5, retest 2026-07-28): azimuth alone
-				// becomes "—" — a bearing has no meaning at the pole itself,
-				// and is numerically unstable close to it — while elevation
-				// stays valid (it doesn't blow up there, just shrinks toward
-				// 0°, zero-tilt model).
+				// Orbit has no azimuth, only the sub-vessel point (design doc §4.2).
+				// Near a pole the azimuth alone goes to "—": a bearing means
+				// nothing at the pole and is unstable close to it, while elevation
+				// stays valid and merely shrinks toward 0°.
 				SetRow("sun", r.Mode == SaMode.Orbit
 					? "EL " + F(r.SunElevationDeg, "0.0") + "° (sub-v.)"
 					: "EL " + F(r.SunElevationDeg, "0.0") + "° · AZ " + (r.NearPole ? "—" : F(r.SunAzimuthDeg, "0.0") + "°"));
 			}
 			SetRow("flux", F(r.SolarFluxWm2, "N0") + " W/m2");
-			// EXT TEMP + PRESSURE visible in any body-surface context
-			// (Surface OR TidalLock — NOT Orbit) AND the body has an
-			// atmosphere (user correction 2026-07-27, confirmed with a
-			// real case: a GEP body is tidally locked on its star AND has
-			// an atmosphere, matching mockup D). Mode+body, deliberately
-			// NOT a live-pressure/vacuum reading — see extTempRowGo field
-			// doc comment for why. Checked every tick, not just on mode
-			// change: BodyHasAtmosphere could theoretically differ if the
-			// active vessel changes without a mode change, and it's cheap.
+			// Checked every tick rather than on a mode change: BodyHasAtmosphere
+			// can change when the active vessel does, and the check is cheap.
 			bool showAtmosphericRows = SaWeatherVisibility.ShowAtmosphericRows(r);
 			if (extTempRowGo != null) extTempRowGo.SetActive(showAtmosphericRows);
 			if (pressureRowGo != null) pressureRowGo.SetActive(showAtmosphericRows);
-			// Weather extension host (bug fix 2026-08-17): same rule as
-			// above, not just "not Orbit" — no clouds without an atmosphere.
+			// The companion slot follows the same rule: no clouds without air.
 			if (weatherHostGo != null) weatherHostGo.SetActive(showAtmosphericRows);
-			// WEATHER needs EVE on top of an atmosphere: Unknown means there is
-			// nothing to say, so the section goes away rather than showing a dash.
-			// Not tied to showAtmosphericRows any more (test 2026-09-11): an
-			// airless body can show weather too, but only from inside a plume
-			// — the classifier reports Unknown there for anything less, so
-			// the section still hides itself on every ordinary airless moon.
-			//
-			// Exception (user decision 2026-09-12): with the Weather Report
-			// switched on and its companion installed, Unknown is SHOWN, as
-			// the same dim cloud and UNKNOWN label the science gate uses —
-			// so the companion's ✎ button, which lives in this section's
-			// corner, is reachable on Mun or Vall too, where "SA shows
-			// nothing here" is exactly the report worth sending. SA reads
-			// only its own setting for this; consent is the companion's
-			// business (before it is given the companion keeps its button
-			// hidden, after a Decline the setting itself goes back off).
+			// The weather section is NOT tied to showAtmosphericRows: an airless
+			// body can show weather from inside a plume, and the classifier
+			// reports Unknown for anything less, so the section still hides itself
+			// on an ordinary airless moon. With the Weather Report on and its
+			// companion installed, Unknown is shown instead as a locked section,
+			// so the companion's corner button stays reachable exactly where "SA
+			// shows nothing here" is the report worth sending. SA reads only its
+			// own setting here; consent is the companion's business.
 			SaWeatherVisibility.Level weatherVis = SaWeatherVisibility.Compute(r);
 			bool showWeather = weatherVis != SaWeatherVisibility.Level.Hidden;
 			if (weatherSectionGo != null) weatherSectionGo.SetActive(showWeather);
-			// Science gate (go 2026-09-10): a value not yet measured on this
-			// body shows "???" in dim text — the row stays, so the layout does
-			// not jump and the player can see there is something to unlock.
-			// "???" rather than the "—" used elsewhere: that dash means "no
-			// such value here", this means "there is one, you don't know it".
+			// A value not yet measured on this body shows "???" in dim text, the
+			// row staying so the layout does not jump. "???" rather than the "—"
+			// used elsewhere: that dash means "no such value here", this one means
+			// "there is one, and you do not know it".
 			if (showAtmosphericRows)
 			{
 				if (r.ExtTempUnlocked) SetTemperatureRow(r.ExternalTemperatureK);
@@ -1005,8 +862,8 @@ namespace SituationalAwareness.UI
 			}
 			if (showWeather)
 			{
-				// Both locked cases (science gate, unknown sky kept for the report)
-				// share the padlock face, no badge (2026-09-19).
+				// Both locked cases — the science gate, and an unknown sky kept on
+				// screen for the report — share the padlock face and carry no badge.
 				switch (weatherVis)
 				{
 					case SaWeatherVisibility.Level.LockedNoReading:
@@ -1018,25 +875,16 @@ namespace SituationalAwareness.UI
 			SetRow("gravity", FormatGravity(r, out Color gravityColor), gravityColor);
 			if (r.Mode == SaMode.TidalLock)
 			{
-				// Cyan (M3 restyling, mockup D reconciliation).
 				SetRow("terminator", FormatTerminator(r.TerminatorDistanceKm, r.TerminatorDistanceDeg, r.TerminatorToEast), SaUi.Cyan);
 			}
 
 			string lockedBadge = r.BodyTidallyLocked
 				? " · <color=" + LockedBadgeColorHex + ">" + Loc("#LOC_SA_val_locked") + "</color>"
 				: "";
-			// A star has no solar day relative to itself — omit the segment
-			// entirely when orbiting one directly (bug fix 2026-07-22).
-			// Timer format survey (retest 2026-07-28/29): "how long is this
-			// body's day relative to UT" is the "relative local time"
-			// concept — a plain duration in UT seconds, global timer
-			// format. Bug fix (retest 2026-07-30): does NOT "fall out
-			// naturally" for the home body as assumed — fmt.Day is
-			// CALIBRATED to equal the home body's own solar day exactly, so
-			// dividing gives exactly 1 (a circular, useless "1d 00h 00m")
-			// instead of the intended "how many hours". Restored the
-			// dedicated home-only exception the old bespoke
-			// FormatSolarDayDuration had, via FormatHomeSolarDayDuration.
+			// A star has no solar day relative to itself, so the segment is omitted
+			// when orbiting one directly. The home body needs its own formatter:
+			// fmt.Day is calibrated to equal its solar day exactly, so the global
+			// duration format would render a circular "1d 00h 00m".
 			string solarDaySegment = r.BodyIsStar
 				? ""
 				: " · " + Loc("#LOC_SA_footer_solarDay") + " "
@@ -1064,11 +912,9 @@ namespace SituationalAwareness.UI
 			string[] parts = new string[r.BodyChain.Length];
 			for (int i = 0; i < r.BodyChain.Length; i++)
 			{
-				// BodyChain stores raw CelestialBody refs (bypasses the
-				// already-cleaned r.BodyName/StarName strings) — needs the
-				// same gender-tag cleaning (test M2 retest; bug fix
-				// 2026-07-24: switched to LocalizeRemoveGender, see
-				// SaReadoutProvider.CleanDisplayName doc comment).
+				// BodyChain holds raw CelestialBody refs, bypassing the already
+				// cleaned r.BodyName/StarName, so the gender tag must be stripped
+				// here too (see SaReadoutProvider.CleanDisplayName).
 				parts[i] = SaReadoutProvider.CleanDisplayName(r.BodyChain[i].displayName).ToUpperInvariant();
 			}
 			return string.Join(" // ", parts);
@@ -1080,12 +926,10 @@ namespace SituationalAwareness.UI
 			switch (r.Mode)
 			{
 				case SaMode.Surface:
-					// Stellar dive exception (retest 2026-07-28): the body
-					// IS the star — no external sun to derive a local time/
-					// day cycle from. Field-level override within Surface
-					// mode (not a dedicated SaMode) so EXT TEMP/PRESSURE's
-					// existing Mode==Surface condition keeps applying
-					// automatically.
+					// Stellar dive: the body IS the star, with no external sun to
+					// derive a local time or day cycle from. An override inside
+					// Surface mode rather than a mode of its own, so the rows
+					// keyed on Mode == Surface keep applying.
 					if (r.BodyIsStar)
 					{
 						SetLabel("clockMain", Loc("#LOC_SA_val_stellarDive"), SaUi.Danger);
@@ -1095,15 +939,11 @@ namespace SituationalAwareness.UI
 						tickLeft = "—"; tickMid = ""; tickRight = "—";
 						break;
 					}
-					// Near-pole exception (M3 point 5, go 2026-07-28): NOT
-					// dangerous (unlike stellar dive) — neutral color, not
-					// Danger red. "POLAR ZONE" explains why the clock can't
-					// be trusted (longitude is unstable right at the pole);
-					// "MIDNIGHT SUN" on the phase line describes what's
-					// actually happening (zero-tilt model: the sun still
-					// technically sets, but the elevation swing shrinks to
-					// nothing this close to the pole, so it never gets
-					// meaningfully dark).
+					// Near the pole: neutral colour, nothing being dangerous here.
+					// "POLAR ZONE" says why the clock cannot be trusted, and
+					// "MIDNIGHT SUN" on the phase line says what is happening —
+					// the sun still technically sets, but its elevation swing
+					// shrinks to nothing this close to the pole.
 					if (r.NearPole)
 					{
 						SetLabel("clockMain", Loc("#LOC_SA_val_polarZone"), SaUi.TextDim);
@@ -1114,30 +954,20 @@ namespace SituationalAwareness.UI
 						break;
 					}
 					SetLabel("clockMain", string.Format(CultureInfo.InvariantCulture, "{0:00}:{1:00}:{2:00}", r.LocalHour, r.LocalMinute, r.LocalSecond), SaUi.Amber);
-					// Sol means nothing extra on the home body (design doc §3.4).
-					// Bug fix 2026-07-25: showing the stock Year/Day date there
-					// (old behavior) just repeated the UT row verbatim, because
-					// that date was UT's own calendar date, never actually
-					// dependent on longitude. Real fix: THIS line shows the
-					// true LOCAL calendar date (shifted by the current zone's
-					// offset before formatting) — genuinely testable for the
-					// date-line-equivalent crossing, unlike the old duplicate.
-					// UT itself keeps showing its own date+time (user request,
-					// M3 test: the two are conceptually distinct now, not a
-					// duplicate, even though they usually agree in value).
-					// Cyan (M3 restyling, mockup A reconciliation).
+					// Sol means nothing extra on the home body (design doc §3.4), so
+					// this line shows the true LOCAL calendar date there, shifted
+					// by the current zone's offset before formatting. The UT row
+					// keeps its own date: the two are distinct concepts even when
+					// they agree in value.
 					string dateLine = r.IsHomeBody ? FormatLocalDate(r) : Loc("#LOC_SA_val_sol") + " " + r.Sol;
 					string dateLineColored = string.IsNullOrEmpty(dateLine) ? "" : "<color=#" + SaUi.CyanHex + ">" + dateLine + "</color>";
 					SetLabel("clockSub", Loc("#LOC_SA_val_localTime") + " · TZ" + (r.TimeZoneIndex >= 0 ? "+" : "") + r.TimeZoneIndex
 						+ "\n" + dateLineColored, SaUi.TextDim);
 					phaseText = Loc(PhaseKeySurface(r.PhaseSurface, r.BodyHasAtmosphere));
-					// Two/three lines, arrow leading the countdown (M3
-					// restyling, mockup reconciliation — matches what the
-					// strip already did): "day 64%" / "↓ sunset 2h39m" /
-					// optionally "SOLAR 12:34:56" (M3 point 6). Cache the
-					// pieces Update()'s fast countdown-only path can't
-					// afford to recompute every frame (see that method's
-					// doc comment).
+					// Two or three lines, the arrow leading the countdown: "day 64%"
+					// / "↓ sunset 2h39m" / optionally "SOLAR 12:34:56". The pieces
+					// Update()'s fast path cannot recompute per frame are cached
+					// below.
 					subText = BuildSurfaceSubText(r.DayProgress01, r.NextEventIsSunrise, r.TimeToNextEventSec,
 						r.SolarNextEventIsSunrise, r.SolarTimeToNextEventSec,
 						r.SolarHour, r.SolarMinute, r.SolarSecond, r.EquationOfTimeSec, r.SolarDayLengthSec);
@@ -1159,10 +989,8 @@ namespace SituationalAwareness.UI
 					break;
 				default:
 					SetLabel("clockMain", Loc("#LOC_SA_val_tidalLock"), SaUi.Danger);
-					// Binary day-side/night-side (M3 restyling, mockup D
-					// reconciliation) replaces the 3-way phase name here —
-					// that's still shown under the dial via phaseText below,
-					// this line only needs day vs night, in cyan.
+					// Binary day-side/night-side here; the 3-way phase name is still
+					// shown under the dial through phaseText below.
 					bool isDaySide = Math.Abs(r.TidalLockHourAngleDeg) < 90.0;
 					string sideText = "<color=#" + SaUi.CyanHex + ">" + Loc(isDaySide ? "#LOC_SA_val_daySide" : "#LOC_SA_val_nightSide") + "</color>";
 					SetLabel("clockSub", Loc("#LOC_SA_val_noLocalTime") + "\n" + sideText, SaUi.TextDim);
@@ -1173,18 +1001,15 @@ namespace SituationalAwareness.UI
 			}
 		}
 
-		/// <summary>Terms shown for MET specifically — always down to the second, user request (retest 2026-07-29), unlike every other timer's 3-term cap.</summary>
+		/// <summary>Terms shown for MET specifically: always down to the second,
+		/// unlike every other timer's 3-term cap.</summary>
 		private const int MetMaxTerms = 5;
 
 		/// <summary>
-		/// MET's own value (retest 2026-07-30): always preceded by a literal
-		/// "T+" (mirrors orbit's "T−"), in either of two selectable formats
-		/// — SaParams.MetStockalikeFormat picks between the default
-		/// all-letters timer (FormatDurationYDHMS, always to the second)
-		/// and a "stockalike" hybrid closer to stock's own mission-timer
-		/// look: letters for year/day, colon HH:MM:SS below that
-		/// ("1y 23d 03:14:09"). Year/day terms are OMITTED when zero
-		/// (a fresh launch shouldn't show "0y 0d 00:14:09").
+		/// MET's value, in either of two formats: the default all-letters timer,
+		/// or a stockalike hybrid with letters for year and day and a colon
+		/// HH:MM:SS below ("1y 23d 03:14:09"). Year and day are omitted when zero,
+		/// so a fresh launch does not read "0y 0d 00:14:09".
 		/// </summary>
 		private static string FormatMet(double seconds)
 		{
@@ -1213,29 +1038,17 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Global "timer" formatter (unified, retest 2026-07-28/29): every
-		/// term uses a localized unit-LETTER suffix, never a bare colon pair
-		/// or zero-padding — "32y 311d 11h" / "311d 11h 39m" / "11h 39m 2s"
-		/// / "39m 2s" / "2s". Shows the `maxTerms` largest terms starting
-		/// from wherever the magnitude actually begins — short durations
-		/// don't pad out to a fixed field count, they just show fewer terms
-		/// (user expectation, retest 2026-07-29: a small EqT should read as
-		/// "12m 34s", not "00h 12m 34s"). Uses KSPUtil.dateTimeFormatter's
-		/// own Year/Day/Hour/Minute (seconds-per-unit) so tier boundaries
-		/// follow the active clock (stock, JNSQ+Kronometer, RSS...) instead
-		/// of a hardcoded 3600/86400 — same discipline as
-		/// BodyClock.LocalHoursPerDay.
+		/// The global timer format: every term carries a localized unit LETTER,
+		/// never a bare colon pair or zero-padding — "32y 311d 11h", "11h 39m 2s",
+		/// "2s". It shows the `maxTerms` largest terms from wherever the magnitude
+		/// begins, so a short duration reads "12m 34s" rather than "00h 12m 34s".
+		/// Tier boundaries come from dateTimeFormatter, not a hardcoded 3600/86400,
+		/// so they follow the active clock.
 		///
-		/// `shrinkWhenWide` (retest 2026-07-30, user request): the big
-		/// clockMain "T−..." countdown, at 26px bold, could still overlap
-		/// its row-mate ("Period"/clockSub) once the LEADING term reached 2
-		/// digits — empirically fine under 10 of the leading unit
-		/// ("T−9h 58m 43s"), too wide from 10 up. When set, drops one term
-		/// from the cap whenever the leading value is ≥10, regardless of
-		/// which unit that happens to be (the cause is character width, not
-		/// a specific unit) — used only by the two "T−" call sites, not the
-		/// smaller-font fields (Period, MET, EqT, footer) where no overlap
-		/// was reported.
+		/// `shrinkWhenWide` drops one term from the cap whenever the leading value
+		/// reaches two digits, whatever its unit: the big 26px countdown would
+		/// otherwise overlap its row-mate, and the cause is character width rather
+		/// than any particular unit. Only the "T−" call sites pass it.
 		/// </summary>
 		private static string FormatDurationYDHMS(double seconds, int maxTerms = 3, bool shrinkWhenWide = false)
 		{
@@ -1260,15 +1073,10 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Home body exception for the footer's solar-day value (bug fix,
-		/// retest 2026-07-30): the global calendar's Day unit IS the home
-		/// body's own solar day by calibration (dateTimeFormatter.Day comes
-		/// FROM the home body's rotation), so feeding it through
-		/// FormatDurationYDHMS gives a circular, useless "1d 00h 00m" — 1
-		/// home day is trivially always exactly 1 calendar day. Skips the
-		/// day/year tiers entirely, always hours+minutes ("12h 00m" for a
-		/// 12h Kronometer day) — matches what the retired
-		/// FormatSolarDayDuration did for this same case.
+		/// Home-body exception for the footer's solar-day value: the calendar's Day
+		/// unit IS the home body's own solar day by calibration, so the global
+		/// format would render a circular "1d 00h 00m". Skips the day and year
+		/// tiers and always shows hours and minutes.
 		/// </summary>
 		private static string FormatHomeSolarDayDuration(double seconds)
 		{
@@ -1285,19 +1093,12 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// "Proportional local" timer (EqT — retest 2026-07-28/29): d_loc/
-		/// h_loc/m_loc/s_loc, where 1 d_loc = the TARGET body's own solar
-		/// day (solarDayLengthSec) and 1 h_loc = d_loc / N (N =
-		/// BodyClock.LocalHoursPerDay — the SAME global hour count LOCAL
-		/// TIME's own clock digits already use, deliberately NOT a separate
-		/// fixed value: user correction 2026-07-29, "la suddivisione in ore
-		/// dipende sempre dallo standard adottato per Kerbin"). Deliberately
-		/// NOT the global calendar's own Year/Day/Hour (FormatDurationYDHMS)
-		/// — that represents "how long is HOME's day", meaningless for a
-		/// body whose day is a different length. No local-year tier: an
-		/// equation-of-time offset spanning local years would already be a
-		/// red flag on its own (user note 2026-07-29: exceeding even a local
-		/// HOUR is already anomalous), the 3-term cap is enough on its own.
+		/// "Proportional local" timer: one local day is the TARGET body's own solar
+		/// day and one local hour is that divided by BodyClock.LocalHoursPerDay,
+		/// the same global hour count LOCAL TIME's digits use. Not the global
+		/// calendar's tiers, which measure the home body's day and mean nothing on
+		/// a body whose day is a different length. There is no local-year tier: an
+		/// equation-of-time offset even an hour wide is already anomalous.
 		/// </summary>
 		private static string FormatLocalDurationYDHMS(double seconds, double solarDayLengthSec, int maxTerms = 3)
 		{
@@ -1317,8 +1118,8 @@ namespace SituationalAwareness.UI
 			long m = (long)(remAfterHour / minuteLen);
 			double remAfterMinute = remAfterHour - m * minuteLen;
 			long s = (long)Math.Round(remAfterMinute / secondLen);
-			// Rounding the last term can carry into the next one at the
-			// boundary (e.g. 59.6s -> 60) — cheap cascade, cosmetic only.
+			// Rounding the last term can carry into the next at a boundary
+			// (59.6s -> 60): a cheap cascade, cosmetic only.
 			if (s >= 60) { s = 0; m++; }
 			if (m >= 60) { m = 0; h++; }
 			if (h >= n) { h = 0; d++; }
@@ -1328,17 +1129,12 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Shared term-joiner for both timer formatters: finds the largest
-		/// non-zero unit, shows up to `maxTerms` from there downward. No
-		/// zero-padding on any term (bug fix, retest 2026-07-30: the
-		/// letter suffix already disambiguates each field, unlike a colon
-		/// pair — padding just added width for nothing, and on a high
-		/// Kerbin orbit "T−65g 05o 58m" was long enough to clip against
-		/// "Period 65g 08o 18m" next to it; "T−65g 5o 1m" is shorter with
-		/// no loss of clarity). `shrinkWhenWide` drops one more term
-		/// whenever the leading value has reached 2+ digits (empirically
-		/// where clockMain's 26px font starts to overlap — see
-		/// FormatDurationYDHMS's doc comment).
+		/// Shared term-joiner for both timer formatters: finds the largest non-zero
+		/// unit and shows up to `maxTerms` from there down. No zero-padding, the
+		/// letter suffix already disambiguating each field where a colon pair
+		/// would not — padding only added width, enough to clip a long countdown
+		/// against the value beside it. `shrinkWhenWide` drops one more term when
+		/// the leading value reaches two digits.
 		/// </summary>
 		private static string JoinDurationTerms(long[] values, string[] symbols, int maxTerms, bool shrinkWhenWide = false)
 		{
@@ -1360,18 +1156,12 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Unit-letter symbols for duration formatting (retest 2026-07-28/29,
-		/// user request): sourced from stock's own #autoLOC_600231x keys —
-		/// verified on the decompiled KSPUtil.cs, DefaultDateTimeFormatter's
-		/// own PrintTime uses these exact keys internally — instead of
-		/// hardcoded English letters, so e.g. Italian shows "a/g/h/m/s"
-		/// instead of "y/d/h/m/s". These are STOCK keys, not Kronometer's,
-		/// but that's fine: Kronometer only changes HOW LONG an hour/day is
-		/// (dateTimeFormatter.Hour/Day), never the WORD for it, so the same
-		/// symbol source is correct with or without it installed. Falls back
-		/// to SA's own #LOC_SA_unit_* keys only if the stock key doesn't
-		/// resolve (Localizer.Format's own convention: returns the key
-		/// itself unchanged when not found).
+		/// Unit-letter symbols for duration formatting, taken from the stock
+		/// #autoLOC_600231x keys the game's own PrintTime uses, so a translated
+		/// game shows its own letters rather than hardcoded English ones. Stock
+		/// keys are right with or without Kronometer, which changes how long an
+		/// hour is but never the word for it. Falls back to SA's own
+		/// #LOC_SA_unit_* keys when a stock key does not resolve.
 		/// </summary>
 		private static string TimeUnitYear => AutoLocOrFallback("#autoLOC_6002321", "#LOC_SA_unit_year");
 		private static string TimeUnitDay => AutoLocOrFallback("#autoLOC_6002320", "#LOC_SA_unit_day");
@@ -1386,15 +1176,12 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Orbit mode's clock-sub two-line text: "NEXT <phase>"/"STAR-CENTRIC"/
-		/// "SOI CHANGE" + "Period ..." in cyan. Single source of truth shared
-		/// by the throttled BuildClockAndPhase and SaWindow's unthrottled
-		/// per-tick orbit-timer refresh (retest 2026-07-27) — the two paths
-		/// can never disagree on formatting. Priority: an imminent SoI change
-		/// (escape trajectory) is the most time-critical fact and wins even
-		/// when BodyIsStar is also true (a rare case: escaping a star's own
-		/// SoI); star-centric is next (no eclipse geometry orbiting the light
-		/// source itself); otherwise the normal eclipse/light countdown.
+		/// Orbit mode's clock-sub text, shared by the throttled BuildClockAndPhase
+		/// and the unthrottled orbit-timer refresh so neither can disagree on
+		/// formatting. Priority: an imminent SoI change is the most time-critical
+		/// fact and wins even over BodyIsStar; star-centric comes next, there
+		/// being no eclipse geometry around the light source; otherwise the
+		/// ordinary eclipse/light countdown.
 		/// </summary>
 		private static string FormatOrbitClockSub(bool bodyIsStar, bool nextEventIsSoiChange, bool nextEventIsEclipse, double orbitPeriodSec)
 		{
@@ -1407,15 +1194,11 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Orbit lit-fraction display (bug fix, retest 2026-07-30): on a
-		/// high enough orbit the shadow cone subtends such a tiny angle
-		/// that the rounded percentage reads "100%" even though a real
-		/// eclipse exists and can last hours there — numerically correct,
-		/// navigationally misleading (a player might not expect any night
-		/// at all). Shows ">99%" instead whenever the value would round to
-		/// 100 but isn't genuinely, exactly full — the star-orbiting case
-		/// (BodyIsStar, where LitFraction01 really is always exactly 1.0,
-		/// no eclipse geometry applies at all) still shows a plain "100%".
+		/// Orbit lit-fraction display. On a high orbit the shadow cone subtends so
+		/// small an angle that the percentage rounds to 100 while a real eclipse
+		/// still exists and can last hours: correct, but misleading. Such a value
+		/// shows ">99%" instead, while the star-orbiting case, genuinely and
+		/// exactly full, keeps a plain "100%".
 		/// </summary>
 		private static string FormatLitFraction(double litFraction01, bool bodyIsStar)
 		{
@@ -1424,16 +1207,12 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Surface mode's dial sub-label: day%/countdown (2 lines, always),
-		/// plus SOLAR TIME as an optional 3rd line (M3 point 6, go
-		/// 2026-07-28) when SaParams.ShowSolarTime is on — single source of
-		/// truth shared by the throttled BuildClockAndPhase and SaWindow's
-		/// unthrottled per-frame countdown refresh, same pattern as
-		/// FormatOrbitClockSub. When SOLAR TIME is on, the countdown itself
-		/// switches from the zone-quantized value to the exact-longitude one
-		/// (user request 2026-07-28: more precise once exact-position time
-		/// is available anyway) — day% stays zone-based regardless (LOCAL
-		/// TIME's own fraction, unaffected).
+		/// Surface mode's dial sub-label: day percentage and countdown on two
+		/// lines, plus SOLAR TIME as an optional third. Shared by the throttled
+		/// BuildClockAndPhase and the unthrottled per-frame countdown refresh,
+		/// like FormatOrbitClockSub. With SOLAR TIME on, the countdown switches
+		/// from the zone-quantized value to the exact-longitude one, while the
+		/// day percentage stays zone-based, being LOCAL TIME's own fraction.
 		/// </summary>
 		private static string BuildSurfaceSubText(double dayProgress01,
 			bool nextEventIsSunrise, double timeToNextEventSec,
@@ -1444,28 +1223,21 @@ namespace SituationalAwareness.UI
 			bool useSunrise = showSolar ? solarNextEventIsSunrise : nextEventIsSunrise;
 			double countdownSec = showSolar ? solarTimeToNextEventSec : timeToNextEventSec;
 
-			// Timer format survey (retest 2026-07-28/29): this countdown used to
-			// delegate to stock's own PrintTimeCompact (FormatDuration) — a
-			// different convention from every other "time to event" field in
-			// the panel. Unified onto FormatDurationYDHMS like the rest.
+			// Same formatter as every other "time to event" field in the panel,
+			// rather than stock's own PrintTimeCompact convention.
 			string text = Loc("#LOC_SA_val_dayProgress") + " " + F(dayProgress01 * 100.0, "0") + "%\n"
 				+ (useSunrise ? "↑" : "↓") + " "
 				+ (useSunrise ? Loc("#LOC_SA_val_sunrise") : Loc("#LOC_SA_val_sunset")) + " " + FormatDurationYDHMS(countdownSec);
 
 			if (showSolar)
 			{
-				// Label cycles with the value (retest 2026-07-30, user
-				// request): the two formats are DIFFERENT quantities (a
-				// time-of-day vs a signed offset), not two units/views of
-				// the same one — every other cyclable field in the panel
-				// is the latter, so a fixed "SOLAR" prefix on both
-				// invited reading EqT as "zone time minus solar time"
-				// (it isn't — EqT doesn't depend on longitude at all,
-				// zone or exact, see FormatEquationOfTime's doc comment).
-				// "LAT" (Local Apparent Time) is the standard gnomonics/
-				// astronomy term for exactly this quantity — the time a
-				// sundial would show — paired with "EQT" the same way
-				// LMT/EoT are paired in that literature.
+				// The label cycles with the value, because the two formats are
+				// DIFFERENT quantities — a time of day and a signed offset — not
+				// two views of one, unlike every other cyclable field here. A
+				// fixed prefix on both invited reading EqT as "zone time minus
+				// solar time", which it is not. "LAT" (Local Apparent Time) is the
+				// standard term for what a sundial shows, paired with "EQT" the
+				// way LMT and EoT are paired in that literature.
 				bool isClock = SaPersist.SolarTimeFormat == SaSolarTimeFormat.Clock;
 				string prefix = Loc(isClock ? "#LOC_SA_val_solarTimePrefix" : "#LOC_SA_val_eqtPrefix");
 				string line3 = isClock
@@ -1477,15 +1249,10 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// SOLAR TIME's second click-cycled format: signed, "proportional
-		/// local" units (retest 2026-07-28/29, user-clarified design) — NOT
-		/// the global calendar's own year/day/hour (that's "how long is
-		/// HOME's day", irrelevant to a body whose day is a different
-		/// length). 1 local day = the TARGET body's own solarDayLengthSec;
-		/// 1 local hour = that / BodyClock.LocalHoursPerDay (the SAME N
-		/// LOCAL TIME's own clock digits already use — not a separate fixed
-		/// value); 60 local minutes/hour, 60 local seconds/minute. See
-		/// FormatLocalDurationYDHMS.
+		/// SOLAR TIME's second click-cycled format: signed, in the proportional
+		/// local units of <see cref="FormatLocalDurationYDHMS"/> rather than the
+		/// global calendar's, which measures the home body's day and means nothing
+		/// on a body whose day is a different length.
 		/// </summary>
 		private static string FormatEquationOfTime(double seconds, double solarDayLengthSec)
 		{
@@ -1496,15 +1263,13 @@ namespace SituationalAwareness.UI
 		private void ApplyStrip(SaReadout r)
 		{
 			SaDial.UpdateStripIcon(stripDial, r);
-			// Surface-only (M3 restyling, mockup B1) — also hidden on a
-			// stellar dive or near a pole (retest 2026-07-28), no reliable
-			// local date to show in either case.
+			// Surface-only, and hidden on a stellar dive or near a pole: neither
+			// has a reliable local date to show.
 			stripDate.gameObject.SetActive(r.Mode == SaMode.Surface && !r.BodyIsStar && !r.NearPole);
 			switch (r.Mode)
 			{
 				case SaMode.Surface:
-					// Stellar dive exception (retest 2026-07-28): see
-					// BuildClockAndPhase's matching branch, same reasoning.
+					// Stellar dive: see BuildClockAndPhase's matching branch.
 					if (r.BodyIsStar)
 					{
 						stripHot.text = Loc("#LOC_SA_val_stellarDive");
@@ -1513,9 +1278,8 @@ namespace SituationalAwareness.UI
 						stripTail.text = "";
 						break;
 					}
-					// Near-pole exception (M3 point 5, go 2026-07-28): see
-					// BuildClockAndPhase's matching branch — neutral color,
-					// not Danger (not hazardous, just unreliable).
+					// Near the pole: neutral colour, not Danger — unreliable
+					// rather than hazardous.
 					if (r.NearPole)
 					{
 						stripHot.text = Loc("#LOC_SA_val_polarZone");
@@ -1527,17 +1291,15 @@ namespace SituationalAwareness.UI
 					stripHot.text = string.Format(CultureInfo.InvariantCulture, "{0:00}:{1:00}:{2:00}", r.LocalHour, r.LocalMinute, r.LocalSecond);
 					stripHot.color = SaUi.Amber;
 					stripDate.text = r.IsHomeBody ? FormatLocalDate(r) : Loc("#LOC_SA_val_sol") + " " + r.Sol;
-					// Uppercase (M3 restyling, mockup reconciliation).
 					stripPhase.text = Loc(PhaseKeySurface(r.PhaseSurface, r.BodyHasAtmosphere)).ToUpperInvariant();
 					stripTail.text = (r.NextEventIsSunrise ? "↑" : "↓") + " " + FormatDurationYDHMS(r.TimeToNextEventSec);
 					break;
 				case SaMode.Orbit:
 					stripHot.text = "T−" + FormatDurationYDHMS(r.TimeToNextEventSec, shrinkWhenWide: true);
 					stripHot.color = SaUi.Amber;
-					// Both words always shown, fixed order (M3 restyling,
-					// mockup reconciliation): current phase bright, the
-					// other dim — rather than swapping which single word is
-					// shown, matches the mockup's "ECLIPSE SUNLIT" pair.
+					// Both words always shown in a fixed order, the current phase
+					// bright and the other dim, rather than swapping which single
+					// word appears.
 					{
 						bool eclipseActive = r.PhaseOrbit == SaPhaseOrbit.Eclipse;
 						string eclipseWord = Loc("#LOC_SA_phase_eclipse").ToUpperInvariant();
@@ -1546,14 +1308,12 @@ namespace SituationalAwareness.UI
 						string dimHex = eclipseActive ? SaUi.TextDimHex : SaUi.TextHex;
 						stripPhase.text = "<color=#" + activeHex + ">" + eclipseWord + "</color> <color=#" + dimHex + ">" + sunlitWord + "</color>";
 					}
-					// "light" prefix, lowercase (M3 restyling, mockup B2).
 					stripTail.text = Loc("#LOC_SA_val_lightLower") + " " + FormatLitFraction(r.OrbitLitFraction01, r.BodyIsStar);
 					break;
 				default:
 					stripHot.text = Loc("#LOC_SA_val_tidalLock");
 					stripHot.color = SaUi.Danger;
 					stripPhase.text = Loc(PhaseKeyTidalLock(r.PhaseTidalLock)).ToUpperInvariant();
-					// "TERM" prefix, cyan (M3 restyling, mockup B3).
 					stripTail.text = "<color=#" + SaUi.CyanHex + ">" + Loc("#LOC_SA_val_termShort") + " "
 						+ FormatTerminator(r.TerminatorDistanceKm, r.TerminatorDistanceDeg, r.TerminatorToEast) + "</color>";
 					break;
@@ -1562,16 +1322,12 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Strip's weather icon + external temperature (2026-09-15, user
-		/// request): same SaWeatherVisibility the extended widget uses, so
-		/// the two views can never show it in different situations. No name
-		/// label (the icon alone carries the state) and no severity badge
-		/// (user: "senza badge") — just the glyph, tinted the same neutral
-		/// grey as the widget's default state colour when unlocked, or the
-		/// dim locked colour when not. The locked icon itself now carries a
-		/// padlock (user is redrawing SA_weather_locked.png), which is why
-		/// there is no separate "?" mark here the way the widget's corner
-		/// badge has one.
+		/// The strip's weather icon and external temperature, on the same
+		/// SaWeatherVisibility the extended widget uses so the two views can never
+		/// show it in different situations. No state name — the icon carries it —
+		/// and no severity badge: just the glyph, in the widget's neutral grey
+		/// when unlocked and its dim colour when not. The locked icon is a
+		/// padlock, so no separate mark is needed to say so.
 		/// </summary>
 		private void ApplyStripWeather(SaReadout r)
 		{
@@ -1585,9 +1341,9 @@ namespace SituationalAwareness.UI
 			if (vis == SaWeatherVisibility.Level.Shown)
 			{
 				bool isNight = r.SunElevationDeg < 0.0;
-				// Flavor can still override the icon here (user: "rispetta
-				// icone custom in WEATHER_FLAVOR") — same lookup the widget
-				// uses, name output discarded since the strip has no label.
+				// Flavor still overrides the icon here, through the same lookup
+				// the widget uses; the name is discarded, the strip having no
+				// label for it.
 				SaWeatherFlavor.Resolve(r.BodyNameInternal, r.Weather.State, isNight, null,
 					SaWeatherIcons.PathFor(r.Weather.State, isNight), out _, out iconPath);
 				iconColor = SaUi.Text;
@@ -1605,11 +1361,9 @@ namespace SituationalAwareness.UI
 				stripWeatherIcon.color = iconColor;
 			}
 
-			// Same rule as the extended EXT TEMP row (SaWeatherVisibility.
-			// ShowAtmosphericRows): an airless body showing weather only from
-			// inside a plume has no ambient temperature to speak of, so the
-			// icon stands alone there rather than showing a stale or made-up
-			// figure.
+			// Same rule as the extended EXT TEMP row: an airless body showing
+			// weather only from inside a plume has no ambient temperature to
+			// speak of, so the icon stands alone there.
 			bool showTemp = SaWeatherVisibility.ShowAtmosphericRows(r);
 			if (stripWeatherTemp != null)
 			{
@@ -1664,11 +1418,9 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// M3 point 6 (go 2026-07-28): no-op when SOLAR TIME isn't even
-		/// shown — the click-catcher covers the whole dial labels area
-		/// unconditionally (Surface/Orbit/TidalLock all share it), so a
-		/// click there when the line isn't visible would otherwise silently
-		/// flip a preference with no feedback.
+		/// A no-op while SOLAR TIME is not shown: the click-catcher covers the
+		/// whole dial labels area in every mode, so a click there would otherwise
+		/// flip a preference silently, with nothing on screen to show for it.
 		/// </summary>
 		private void CycleSolarTimeFormat()
 		{
@@ -1679,7 +1431,9 @@ namespace SituationalAwareness.UI
 			SaPersist.Save();
 		}
 
-		/// <summary>EXT TEMP: 3-tier now (M3 restyling) — cyan cold, neutral, warn (50-100°C), danger (&gt;100°C). Absolute thresholds make sense here: it's the one true ambient reading, not a part-specific value.</summary>
+		/// <summary>EXT TEMP, in three tiers: cyan cold, neutral, warn, danger.
+		/// Absolute thresholds make sense here, this being the one true ambient
+		/// reading rather than a part-specific value.</summary>
 		private void SetTemperatureRow(double kelvin)
 		{
 			FormatExtTemp(kelvin, out string text, out Color c);
@@ -1687,17 +1441,15 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Same text + colour FormatExtTemp always produced for SetTemperatureRow,
-		/// pulled out (2026-09-15) so the strip's weather block can show the exact
-		/// same figure without a second copy of the thresholds to drift out of sync.
+		/// The text and colour SetTemperatureRow shows, pulled out so the strip's
+		/// weather block can show the same figure without a second copy of the
+		/// thresholds to drift out of sync.
 		/// </summary>
 		private static void FormatExtTemp(double kelvin, out string text, out Color color)
 		{
 			double celsius = kelvin - 273.15;
-			// N1 (thousands separator, retest 2026-07-28 — matches FLUX's
-			// N0): HULL TEMP in particular routinely hits four figures on
-			// reentry (1500-2000+ K), where a bare "1500.0" reads slower
-			// than "1,500.0".
+			// Thousands separator, as FLUX has: HULL TEMP routinely hits four
+			// figures on reentry, where "1500.0" reads slower than "1,500.0".
 			text = SaPersist.TempUnit == SaTempUnit.Kelvin
 				? F(kelvin, "N1") + " K"
 				: F(celsius, "N1") + " °C";
@@ -1708,7 +1460,10 @@ namespace SituationalAwareness.UI
 			else if (celsius > HighTempAlertC) color = SaUi.Warn;
 		}
 
-		/// <summary>HULL TEMP (M3 restyling): value is the thermal-mass-weighted average (SaReadoutProvider.BuildHullTemperature), but the COLOR comes from worstRatio — the single hottest part's T/maxTemp — so one part near its limit shows red even while the fleet-wide average still looks comfortable. Cold side stays absolute (sub-zero is sub-zero for any material).</summary>
+		/// <summary>HULL TEMP: the value is the thermal-mass-weighted average, but
+		/// the COLOUR comes from worstRatio, the single hottest part's T/maxTemp,
+		/// so one part near its limit shows red while the average still looks
+		/// comfortable. The cold side stays absolute.</summary>
 		private void SetHullTemperatureRow(double kelvin, double worstRatio)
 		{
 			double celsius = kelvin - 273.15;
@@ -1748,19 +1503,16 @@ namespace SituationalAwareness.UI
 				default: key = "#LOC_SA_weather_clear"; break;
 			}
 
-			// One neutral colour for every state (user request 2026-09-09):
-			// severity moved out of the glyph's tint and into the corner badge,
-			// so the icons read as one family and the mark is the only thing
-			// competing for attention when there IS something to flag.
+			// One neutral colour for every state: severity lives in the corner
+			// badge rather than the glyph's tint, so the icons read as one family
+			// and the mark is the only thing competing for attention.
 			Color c = SaUi.Text;
 
-			// Flavor can override both the name and the icon, never the state
-			// (see SaWeatherFlavor) — so a body whose rain is not water can say
-			// so and carry its own hazard-marked icon.
-			// The generic loc KEY goes in as the fallback, not its translation:
-			// Loc() below resolves whichever wins, and Localizer.Format returns
-			// a non-key string unchanged, so a flavor entry may supply either a
-			// #LOC_ key or a literal.
+			// Flavor overrides the name and the icon, never the state, so a body
+			// whose rain is not water can say so. The generic loc KEY goes in as
+			// the fallback rather than its translation: Loc() below resolves
+			// whichever wins, and Localizer.Format returns a non-key string
+			// unchanged, so an entry may supply either a key or a literal.
 			bool isNight = sunElevationDeg < 0.0;
 			SaWeatherFlavor.Resolve(bodyName, state, isNight, key,
 				SaWeatherIcons.PathFor(state, isNight),
@@ -1794,13 +1546,11 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// The science gate's version of the section (go 2026-09-10): the
-		/// plain locked cloud in the dim text grey under UNKNOWN — the one
-		/// weather label that is uppercase — with the icon carrying its own
-		/// padlock (a cyan "?" badge did this job until 2026-09-16). Also
-		/// the face of a genuinely unknown sky kept visible for the Weather
-		/// Report (2026-09-12), likewise without a badge. No forecast
-		/// either way: a sky you cannot read has no tomorrow.
+		/// The locked face of the section: the padlock icon in dim grey under
+		/// UNKNOWN, the one weather label that is uppercase. Used both by the
+		/// science gate and by a genuinely unknown sky kept visible for the
+		/// Weather Report. No forecast either way — a sky you cannot read has no
+		/// tomorrow.
 		/// </summary>
 		private void SetWeatherLocked()
 		{
@@ -1818,19 +1568,14 @@ namespace SituationalAwareness.UI
 				weatherIcon.enabled = sprite != null;
 			}
 			if (weatherIcon != null) weatherIcon.color = SaUi.TextDim;
-			// No badge in either case (user, 2026-09-16 for the science gate,
-			// 2026-09-19 for the unknown-sky/Weather Report case): the padlock
-			// icon and the UNKNOWN label say it already. The cyan "?" and the
-			// amber "X" that used to sit here are retired.
+			// No badge in either case: the padlock icon and the UNKNOWN label
+			// already say it.
 			SetWeatherBadge(null, SaUi.Cyan);
 			SetWeatherForecast(default(SaWeatherForecast), 0.0);
 		}
 
-		/// <summary>
-		/// The corner badge: hidden for a null glyph. "!" prefers the alert
-		/// texture when one is installed; any other glyph (the locked "?") is
-		/// always the font's, since a texture only knows how to be a "!".
-		/// </summary>
+		/// <summary>Hidden for a null glyph. Only "!" can use the alert texture;
+		/// any other glyph is always the font's.</summary>
 		private void SetWeatherBadge(string glyph, Color color)
 		{
 			if (weatherBadgeText == null) return;
@@ -1880,17 +1625,15 @@ namespace SituationalAwareness.UI
 					text = Localizer.Format("#LOC_SA_forecast_possible", ForecastStateName(forecast.State), when);
 					break;
 				case SaForecastKind.Changeable:
-					// Three wordings for the same fact (user request: less
-					// monotonous), rotated per weather window, not per tick:
-					// the seed is the UT of the next transition, constant
-					// until the front actually changes.
+					// Three wordings for the same fact, rotated per weather
+					// window and not per tick: the seed is the UT of the next
+					// transition, constant until the front changes.
 					long seed = (long)((ut + forecast.Seconds) / 60.0);
 					int variant = (int)(seed % ChangeableWordings) + 1;
 					text = Loc("#LOC_SA_forecast_changeable_" + variant);
 					break;
 				default:
-					// The horizon is a round number of days: "3d+", never
-					// "3d 0h+" (test 2026-09-11).
+					// The horizon is a round number of days: "3d+", not "3d 0h+".
 					text = Localizer.Format("#LOC_SA_forecast_stable", FormatForecastDuration(forecast.Seconds, 1));
 					break;
 			}
@@ -1900,10 +1643,9 @@ namespace SituationalAwareness.UI
 		private const int ChangeableWordings = 3;
 
 		/// <summary>
-		/// Short, lowercase state names for the forecast sentence — their own
-		/// keys, not the state label's: "tempesta di sabbia" does not fit a
-		/// 9px line with a time after it, "temp. sabbia" does. Never the
-		/// flavor name either, for the same reason.
+		/// Short, lowercase state names for the forecast sentence, on their own
+		/// keys rather than the state label's: a full name does not fit a 9px line
+		/// with a time after it. Never the flavor name either, for the same reason.
 		/// </summary>
 		private static string ForecastStateName(SaWeatherState state)
 		{
@@ -1918,11 +1660,10 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Forecast times use the same global-calendar formatter as every
-		/// other countdown in the panel (sunrise, eclipse, SoI change), capped
-		/// at two terms and never showing seconds — weather is not accurate
-		/// to the second, and the sentence has to fit a narrow line. Under a
-		/// minute reads "&lt;1m" rather than a pointless "0m".
+		/// Forecast times use the same global-calendar formatter as every other
+		/// countdown in the panel, capped at two terms and never showing seconds:
+		/// weather is not accurate to the second, and the sentence has to fit a
+		/// narrow line. Under a minute reads "&lt;1m" rather than "0m".
 		/// </summary>
 		private static string FormatForecastDuration(double seconds, int maxTerms = 2)
 		{
@@ -1964,20 +1705,17 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Live = FlightGlobals.getGeeForceAtPosition (same as stock
-		/// sensorGravimeter, m/s^2, gated by the same altitude<=3*radius
-		/// range check — verified on the decompiled ModuleEnviroSensor);
-		/// fixed = body.GeeASL converted to m/s^2. Default is live
-		/// (design doc feedback 2026-07-19); settings toggle switches to
-		/// the fixed ASL value.
+		/// Live = getGeeForceAtPosition, as the stock gravimeter reads it and under
+		/// the same altitude &lt;= 3*radius range check; fixed = body.GeeASL in
+		/// m/s^2. Live by default, with a setting to switch to the ASL value.
 		/// </summary>
 		private static string FormatGravity(SaReadout r, out Color color)
 		{
 			color = SaUi.Text;
 			bool useFixed = SaParams.UseFixedSurfaceGravity;
-			// Science gate (go 2026-09-10): only the LIVE reading is gated —
-			// the body's ASL reference is a known constant and stays visible,
-			// dimmed to say it is the reference, not a measurement.
+			// Only the LIVE reading is gated: the body's ASL reference is a known
+			// constant and stays visible, dimmed to say it is a reference rather
+			// than a measurement.
 			if (!useFixed && !r.GravityUnlocked)
 			{
 				useFixed = true;
@@ -1999,9 +1737,8 @@ namespace SituationalAwareness.UI
 		{
 			if (SaPersist.CoordUnit == SaCoordUnit.Dms)
 			{
-				// Two stacked lines (bug fix, test M2 retest): DMS is much
-				// wider than decimal degrees, "lat / lon" on one line was
-				// overflowing the row sideways.
+				// Two stacked lines: DMS is much wider than decimal degrees, and
+				// "lat / lon" on one line overflows the row sideways.
 				return FormatDms(lat, isLat: true) + "\n" + FormatDms(lon, isLat: false);
 			}
 			return F(lat, "0.00") + "° / " + F(lon, "0.00") + "°";
@@ -2020,16 +1757,12 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// True local calendar date on the home body (bug fix 2026-07-25):
-		/// shifts UT by the current timezone's offset before formatting, so
-		/// it can genuinely differ by a day from UT near the zone opposite
-		/// the reference meridian (the date-line equivalent) — unlike the
-		/// old dateLine, which just formatted raw UT (never a function of
-		/// longitude, hence the duplication with the UT row it replaced).
-		/// Deliberately linear (`k * L`), not the equation-of-time-corrected
-		/// MeanTimeCalibration offset: a calendar date only flips once per
-		/// solar day, so the few-minutes-scale correction is invisible here
-		/// except in the exact seconds around midnight.
+		/// True local calendar date on the home body: UT shifted by the current
+		/// timezone's offset before formatting, so it can genuinely differ by a
+		/// day near the zone opposite the reference meridian, the date-line
+		/// equivalent. Deliberately linear rather than the equation-of-time
+		/// corrected offset: a date only flips once per solar day, so a
+		/// few-minutes correction is invisible except right at midnight.
 		/// </summary>
 		private static string FormatLocalDate(SaReadout r)
 		{
@@ -2073,7 +1806,10 @@ namespace SituationalAwareness.UI
 			}
 		}
 
-		/// <summary>Dawn/Dusk collapse to a single "Terminator" label on airless bodies (user feedback 2026-07-19): without an atmosphere there's no optical twilight to tell them apart. The underlying Dawn/Dusk phase (and its sunrise/sunset event direction) is unchanged, only the displayed label merges.</summary>
+		/// <summary>Dawn and Dusk collapse to a single "Terminator" label on an
+		/// airless body, there being no optical twilight to tell them apart. Only
+		/// the label merges: the underlying phase, and its sunrise/sunset event
+		/// direction, are unchanged.</summary>
 		private static string PhaseKeySurface(SaPhaseSurface p, bool hasAtmosphere)
 		{
 			switch (p)
@@ -2087,7 +1823,8 @@ namespace SituationalAwareness.UI
 			}
 		}
 
-		/// <summary>Binary now (user decision 2026-07-19): "terminator" is a surface concept, orbit only has Sunlit/Eclipse.</summary>
+		/// <summary>Binary: "terminator" is a surface concept, and orbit has only
+		/// Sunlit and Eclipse.</summary>
 		private static string PhaseKeyOrbit(SaPhaseOrbit p)
 		{
 			return p == SaPhaseOrbit.Sunlit ? "#LOC_SA_phase_sunlit" : "#LOC_SA_phase_eclipse";

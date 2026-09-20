@@ -4,15 +4,13 @@ using UnityEngine;
 namespace SituationalAwareness.Core
 {
 	/// <summary>
-	/// Per-body naming and iconography for weather states (notes/indagine-meteo.md
-	/// §3, "Easter egg / flavor per corpo"): "RAIN" is a poor description of what
-	/// falls out of Eve's sky.
+	/// Per-body naming and iconography for weather states: "RAIN" is a poor
+	/// description of what falls out of Eve's sky.
 	///
-	/// **Presentation only.** A flavor entry renames and re-illustrates a state
-	/// the classifier has already decided; it can never change WHICH state that
-	/// is. That boundary is deliberate — the moment a config can reclassify, the
-	/// panel starts saying things the physics behind it does not support, and
-	/// the label silently becomes a lie the day the classifier is retuned.
+	/// **Presentation only.** An entry renames and re-illustrates a state the
+	/// classifier has already decided, and can never change WHICH state that is:
+	/// a config able to reclassify would make the label a lie the day the
+	/// classifier is retuned.
 	///
 	/// Config-driven and ModuleManager-patchable, so a planet pack can describe
 	/// its own bodies without SA knowing anything about them:
@@ -42,17 +40,14 @@ namespace SituationalAwareness.Core
 			public string IconNightPath;
 		}
 
-		// Keyed by "bodyName|State" — bodies are few and this is read once per
-		// classification change, so a dictionary is more than enough.
+		// Keyed by "bodyName|State", read once per classification change.
 		private static Dictionary<string, Entry> entries;
 
 		/// <summary>
-		/// Name and icon to use for this body/state pair, falling back to the
-		/// generic ones when no flavor entry applies. Never returns null for
-		/// <paramref name="name"/> — the caller's fallback is passed in.
-		/// <paramref name="isNight"/> only picks between an entry's own
-		/// <c>icon</c>/<c>iconNight</c> — the generic-icon day/night switch
-		/// already happened in the fallback the caller passed in.
+		/// Name and icon for this body/state pair, falling back to the generic ones
+		/// the caller passes in when no entry applies. <paramref name="isNight"/>
+		/// only picks between an entry's own <c>icon</c>/<c>iconNight</c>: the
+		/// generic day/night switch already happened in the fallback.
 		/// </summary>
 		internal static void Resolve(string bodyName, SaWeatherState state, bool isNight,
 			string fallbackName, string fallbackIconPath, out string name, out string iconPath)
@@ -81,9 +76,8 @@ namespace SituationalAwareness.Core
 				string condition = node.GetValue("condition");
 				if (string.IsNullOrEmpty(body) || string.IsNullOrEmpty(condition)) continue;
 
-				// Unknown/misspelt state names are skipped with a log rather
-				// than silently ignored: a patch that never takes effect is
-				// much harder to debug than one that says why.
+				// Logged rather than silently skipped: a patch that never takes
+				// effect is far harder to debug than one that says why.
 				if (!TryParseState(condition, out SaWeatherState state))
 				{
 					Debug.LogWarning("[SA] " + NodeName + " for " + body
@@ -114,8 +108,8 @@ namespace SituationalAwareness.Core
 			return false;
 		}
 
-		/// <summary>Dropped on scene changes so a ModuleManager reload during
-		/// the session is picked up.</summary>
+		/// <summary>Dropped on scene changes, so a mid-session ModuleManager reload
+		/// is picked up.</summary>
 		internal static void Reset() => entries = null;
 	}
 }

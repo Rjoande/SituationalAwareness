@@ -11,15 +11,13 @@ namespace SituationalAwareness.Core
 	public enum SaTerminatorUnit { Km, Deg }
 	public enum SaGravityUnit { G, Mps2 }
 	public enum SaCoordUnit { Decimal, Dms }
-	// M3 point 6 (go 2026-07-28): SOLAR TIME dial line, click-cycled between
-	// the clock (HH:MM:SS) and the raw equation-of-time gap (±mm:ss).
+	// SOLAR TIME dial line, click-cycled between the clock (HH:MM:SS) and the
+	// raw equation-of-time gap (±mm:ss).
 	public enum SaSolarTimeFormat { Clock, EquationOfTime }
 
 	/// <summary>
-	/// SA section in the stock settings page (Difficulty -> SA), pattern
-	/// KRILL/KrillParams — a stock-looking home for the one player-global
-	/// toggle SA needs (design doc §6.6): showing MET is redundant with the
-	/// stock UI most of the time, default OFF.
+	/// SA's section in the stock settings page (Difficulty -> SA), a stock-looking
+	/// home for the handful of options the panel needs (design doc §6.6).
 	/// </summary>
 	public class SaParams : GameParameters.CustomParameterNode
 	{
@@ -34,12 +32,15 @@ namespace SituationalAwareness.Core
 			toolTip = "#LOC_SA_settings_showMet_tip")]
 		public bool showMissionTime;
 
-		/// <summary>Retest 2026-07-30, user request: alternate MET format, "T+1y 23d 03:14:09" (letters for y/d, colon HH:MM:SS below that — mimics stock's own style) instead of the default all-letters timer. Only meaningful when showMissionTime is on (see Enabled below).</summary>
+		/// <summary>Alternate MET format, "T+1y 23d 03:14:09" in stock's own style,
+		/// instead of the default all-letters timer. Only meaningful while
+		/// showMissionTime is on (see Enabled below).</summary>
 		[GameParameters.CustomParameterUI("#LOC_SA_settings_metStockalike",
 			toolTip = "#LOC_SA_settings_metStockalike_tip")]
 		public bool metStockalikeFormat;
 
-		/// <summary>M3 point 6 (go 2026-07-28): adds a SOLAR TIME line to the Surface dial (design doc §9 point 6) — off by default, same "opt in to an extra line" pattern as MET.</summary>
+		/// <summary>Adds a SOLAR TIME line to the Surface dial; off by default,
+		/// the same opt-in pattern as MET.</summary>
 		[GameParameters.CustomParameterUI("#LOC_SA_settings_showSolarTime",
 			toolTip = "#LOC_SA_settings_showSolarTime_tip")]
 		public bool showSolarTime;
@@ -53,44 +54,33 @@ namespace SituationalAwareness.Core
 		public bool useBodyMapColorForDial;
 
 		/// <summary>
-		/// Science gate (go 2026-09-10): EXT TEMP, PRESSURE, live GRAVITY and
-		/// WEATHER stay "???" on a body until the matching experiment has
-		/// been credited there (SaScienceGate, ScienceGate.cfg). On by
-		/// default — the point is that the panel learns with the program —
-		/// with no effect in Sandbox, where there is no R&amp;D to ask.
+		/// EXT TEMP, PRESSURE, live GRAVITY and WEATHER stay "???" on a body until
+		/// the matching experiment has been credited there (SaScienceGate). On by
+		/// default, so the panel learns along with the program; no effect in
+		/// Sandbox, where there is no R&amp;D to ask.
 		/// </summary>
 		[GameParameters.CustomParameterUI("#LOC_SA_settings_scienceGate",
 			toolTip = "#LOC_SA_settings_scienceGate_tip")]
 		public bool gateOnScience = true;
 
 		/// <summary>
-		/// Weather report (go 2026-09-10): the opt-in diagnostic companion
-		/// (SaWeatherReport.dll, notes/indagine-meteo.md §8). Off by default;
-		/// the companion reads this and, the first time it is on with no
-		/// consent on record, shows its disclaimer in flight — declining
-		/// puts this back to off. SA itself does nothing with it.
+		/// Opt-in switch for the diagnostic companion (SaWeatherReport.dll), off
+		/// by default. The companion reads this and, the first time it is on with
+		/// no consent on record, shows its disclaimer in flight; declining puts it
+		/// back to off. SA itself does nothing with it.
 		/// </summary>
 		[GameParameters.CustomParameterUI("#LOC_SA_settings_weatherReport",
 			toolTip = "#LOC_SA_settings_weatherReport_tip")]
 		public bool enableWeatherReport;
 
 		/// <summary>
-		/// Window/font scale, on top of the stock UI Scale (retest
-		/// 2026-07-27: general readability complaint, "+50%, regolabile?").
-		/// Default reverted to 1.0 (further refinement, same day) — the
-		/// user's first-pass default of 1.5 turned out too aggressive once
-		/// seen in game; range extended below 1.0 too, for players who want
-		/// it smaller. Range 0.5-2.0 in 0.05 steps (matches
-		/// CustomFloatParameterUI usage elsewhere in stock GameParameters.cs,
-		/// e.g. the physics-range sliders: stepCount + minValue/maxValue +
-		/// displayFormat).
+		/// Window/font scale stacked on top of the stock UI Scale, 0.5-2.0 in 0.05
+		/// steps.
 		///
-		/// Global, not per save, since 2026-09-14 (user: the scale did not
-		/// survive a change of save, and it should): this slider is only the
-		/// CONTROL, the value itself lives in SaPersist (settings.cfg) and
-		/// SaUiScaleSync copies it into every loaded game and back out when
-		/// the player moves it. A GameParameters field is still the only way
-		/// to get a slider into the stock settings dialog.
+		/// Global rather than per save: this slider is only the CONTROL, while the
+		/// value lives in SaPersist and SaUiScaleSync copies it in and out. A
+		/// GameParameters field is still the only way to get a slider into the
+		/// stock settings dialog.
 		/// </summary>
 		[GameParameters.CustomFloatParameterUI("#LOC_SA_settings_uiScale",
 			toolTip = "#LOC_SA_settings_uiScale_tip",
@@ -98,14 +88,10 @@ namespace SituationalAwareness.Core
 		public float uiScale = 1.0f;
 
 		/// <summary>
-		/// M3 point 4 (design doc §9, decided 2026-07-25, go 2026-07-28):
-		/// how much of the body's radius a SUB_ORBITAL vessel can be under
-		/// and still read as Surface mode (a short hop, not a real orbital
-		/// insertion) — see SaModeSelector.IsLowSubOrbital. Default 0.25
-		/// (the value decided at design time); range 0.15-1.5 covers a
-		/// strict "barely left the ground" reading up to "basically any
-		/// suborbital arc still counts as surface" on a small/low-gravity
-		/// body.
+		/// How much of the body's radius a SUB_ORBITAL vessel can be under and
+		/// still read as Surface mode (SaModeSelector.IsLowSubOrbital). The 0.15-1.5
+		/// range spans a strict "barely left the ground" reading up to counting any
+		/// suborbital arc as surface on a small, low-gravity body.
 		/// </summary>
 		[GameParameters.CustomFloatParameterUI("#LOC_SA_settings_surfaceAltThreshold",
 			toolTip = "#LOC_SA_settings_surfaceAltThreshold_tip",
@@ -123,10 +109,8 @@ namespace SituationalAwareness.Core
 
 		public override bool Interactible(MemberInfo member, GameParameters parameters)
 		{
-			// metStockalikeFormat only means anything when MET itself is
-			// shown (retest 2026-07-30, user request: "dipendente da show
-			// MET") — greyed out rather than hidden, so the dependency is
-			// visible rather than the option silently disappearing.
+			// metStockalikeFormat only means anything while MET itself is shown.
+			// Greyed out rather than hidden, so the dependency stays visible.
 			if (member.Name == nameof(metStockalikeFormat))
 			{
 				return parameters.CustomParams<SaParams>().showMissionTime;
@@ -151,7 +135,6 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>Off by default: "T+1y 23d 03:14:09" (letters for y/d, colon HH:MM:SS below) instead of the default all-letters MET timer.</summary>
 		public static bool MetStockalikeFormat
 		{
 			get
@@ -164,7 +147,6 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>Off by default: adds the SOLAR TIME line to the Surface dial.</summary>
 		public static bool ShowSolarTime
 		{
 			get
@@ -177,7 +159,7 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>Default (false) = live sensed gravity (sensorGravimeter-style); true = fixed body ASL value.</summary>
+		/// <summary>False = live sensed gravity, true = the fixed body ASL value.</summary>
 		public static bool UseFixedSurfaceGravity
 		{
 			get
@@ -190,7 +172,6 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>On by default: readouts stay hidden ("???") on a body until the matching experiment has been credited there. No effect in Sandbox.</summary>
 		public static bool GateOnScience
 		{
 			get
@@ -203,7 +184,6 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>Off by default: the weather-report companion may show its button (after consent). Read by SaWeatherReport.dll, not by SA.</summary>
 		public static bool EnableWeatherReport
 		{
 			get
@@ -216,7 +196,8 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>Off by default: orbit dial's planet disc uses the body's real map/orbit-line color (attenuated) instead of a neutral default.</summary>
+		/// <summary>Off by default: the orbit dial's planet disc takes the body's
+		/// real map colour instead of a neutral default.</summary>
 		public static bool UseBodyMapColorForDial
 		{
 			get
@@ -231,9 +212,8 @@ namespace SituationalAwareness.Core
 
 		/// <summary>
 		/// SA's own window/font scale multiplier, stacked on top of
-		/// GameSettings.UI_SCALE (retest 2026-07-27). Global since 2026-09-14:
-		/// read from SaPersist, never from the current game — the per-save
-		/// slider is only its control (see SaUiScaleSync).
+		/// GameSettings.UI_SCALE. Read from SaPersist, never from the current
+		/// game: the per-save slider is only its control (see SaUiScaleSync).
 		/// </summary>
 		public static float UiScale
 		{
@@ -244,7 +224,7 @@ namespace SituationalAwareness.Core
 			}
 		}
 
-		/// <summary>Suborbital-altitude threshold multiplier for SaModeSelector (M3 point 4). Defaults to 0.25 even before a game is loaded, matching the field default.</summary>
+		/// <summary>Falls back to the field default before a game is loaded.</summary>
 		public static float SurfaceAltitudeThresholdMultiplier
 		{
 			get
@@ -259,11 +239,10 @@ namespace SituationalAwareness.Core
 	}
 
 	/// <summary>
-	/// Player-global, per-save-independent state: unit choices, window
-	/// position, collapsed strip state (design doc §6.4/§6.7), panel scale
-	/// (2026-09-14). PluginData/,
-	/// not GameData/ (ModuleManager never scans it — same convention as
-	/// KRILL's keymap, no MM cache rebuild on save).
+	/// Player-global state, independent of the save: unit choices, window
+	/// position, collapsed strip state (design doc §6.4/§6.7) and panel scale.
+	/// Lives in PluginData/ rather than GameData/, which ModuleManager never
+	/// scans, so saving it triggers no MM cache rebuild.
 	/// </summary>
 	internal static class SaPersist
 	{

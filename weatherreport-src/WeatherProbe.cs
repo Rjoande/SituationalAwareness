@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace SituationalAwareness.WeatherReport
 {
-	/// <summary>Raw sample of one EVE cloud layer at the moment of a report press (notes/indagine-meteo.md §7).</summary>
+	/// <summary>Raw sample of one EVE cloud layer at the moment of a report press.</summary>
 	internal readonly struct WeatherLayerSample
 	{
 		public readonly string LayerName;
@@ -26,12 +26,10 @@ namespace SituationalAwareness.WeatherReport
 		public readonly float Fade;
 		public readonly float MinAltitudeM;
 		public readonly float MaxAltitudeM;
-		// Particle field of this layer, when it has one at all (empty name
-		// when it doesn't). Reached through EveLayerInfo's cached reflection —
-		// these are what actually separate rain from snow from dust
-		// (fall speed, stretch) and real weather from ambient decoration
-		// (particle count: 500 for Duna-Dust-Sparse against 200k-800k for
-		// real precipitation). See notes/survey-analisi.md.
+		// Particle field of this layer, when it has one; empty name otherwise.
+		// These are what separate rain from snow from dust (fall speed, stretch)
+		// and real weather from ambient decoration (particle count: a few hundred
+		// for scenery against 200k-800k for real precipitation).
 		public readonly string ParticleFieldName;
 		public readonly float ParticleFallSpeed;
 		public readonly float ParticleCount;
@@ -68,9 +66,7 @@ namespace SituationalAwareness.WeatherReport
 	}
 
 	/// <summary>
-	/// Raw snapshot of everything a report button press records
-	/// (notes/indagine-meteo.md §7, corrected for IVA/non-IVA camera —
-	/// EVA vs vessel dropped, adds no information here).
+	/// Raw snapshot of everything a report button press records.
 	/// </summary>
 	internal sealed class WeatherSample
 	{
@@ -88,11 +84,10 @@ namespace SituationalAwareness.WeatherReport
 		public bool CameraIsIva;
 		public Vector3 CameraPosition;
 		public Vector3 VesselPosition;
-		// What SA itself claimed at the moment of the press, via
-		// SaExtensionPoint. The whole point of the companion after the §8.6
-		// pivot is comparing SA's verdict against what the player saw — without
-		// this column a report says "the weather is wrong" with no way to tell
-		// which side of the classifier missed.
+		// What SA itself claimed at the moment of the press. The companion exists
+		// to compare that verdict against what the player saw: without this
+		// column a report says "the weather is wrong" with no way to tell which
+		// side of the classifier missed.
 		public string SaWeatherState;
 		public double SaSkyOpticalDepth;
 		public double SaPrecipIntensity;
@@ -101,10 +96,8 @@ namespace SituationalAwareness.WeatherReport
 	}
 
 	/// <summary>
-	/// Raw EVE/WDSP reader — no classification, that is future work once
-	/// this data has been used to tune it (§7 "Ordine di lavoro"). Soft
-	/// dependency on both: never touches EVE/WDSP types unless their
-	/// assemblies are actually loaded (notes §6).
+	/// Raw EVE/WDSP reader: records, never classifies. Soft dependency on both,
+	/// so it never touches their types unless the assemblies are loaded.
 	/// </summary>
 	internal static class WeatherProbe
 	{
@@ -152,8 +145,8 @@ namespace SituationalAwareness.WeatherReport
 				SolarFluxWm2 = vessel.solarFlux,
 			};
 
-			// radarAltitude reads a huge negative sentinel when there's no
-			// ground return (high orbit/vacuum) — only record when sane.
+			// radarAltitude reads a huge negative sentinel with no ground return,
+			// so it is only recorded when sane.
 			double agl = vessel.radarAltitude;
 			sample.AltitudeAgl = agl > -1e6 ? (double?)agl : null;
 
@@ -172,9 +165,9 @@ namespace SituationalAwareness.WeatherReport
 
 		/// <summary>
 		/// SA's own classification at this instant, through the public
-		/// SaExtensionPoint API. Guarded like everything else here: an older SA
-		/// without these methods must degrade to an empty column, not a crash —
-		/// the companion ships separately and can meet an SA that predates it.
+		/// SaExtensionPoint API. Guarded like everything else here: the companion
+		/// ships separately and can meet an SA that predates these methods, which
+		/// must leave the column empty rather than crash.
 		/// </summary>
 		private static void SampleSaVerdict(Vessel vessel, WeatherSample sample)
 		{
@@ -194,12 +187,10 @@ namespace SituationalAwareness.WeatherReport
 		}
 
 		/// <summary>
-		/// Simplified elevation (angle above the local horizon), home star
-		/// only — a context field for the report row, not the multi-star-
-		/// aware calculation SA's own SolarMath/StarResolver do internally
-		/// (not reachable from here, internal to SA's assembly). Good
-		/// enough for "what did the sky look like", not meant to match SA's
-		/// own SUN row to the decimal.
+		/// Simplified elevation above the local horizon, home star only: SA's own
+		/// multi-star-aware math is internal to its assembly and out of reach
+		/// here. Good enough for "what did the sky look like", not meant to match
+		/// SA's SUN row to the decimal.
 		/// </summary>
 		private static void SampleSunElevation(Vessel vessel, WeatherSample sample)
 		{
@@ -215,17 +206,11 @@ namespace SituationalAwareness.WeatherReport
 		}
 
 		/// <summary>
-		/// IVA vs non-IVA (user correction 2026-08-17: EVA dropped, adds no
-		/// information — droplets-on-glass only exists in IVA/Internal,
-		/// both of which render through InternalCamera, and EVA never
-		/// reaches either). Verified on the decompiled CameraManager.cs:
-		/// CameraMode has Flight/Map/External/IVA/Internal: IVA is a
-		/// kerbal's first-person view, Internal is SetCameraInternal's
-		/// robotic-controller-style internal view — both are "inside", the
-		/// rest is not. Camera.main is used for position rather than
-		/// FlightCamera.fetch.mainCamera specifically because it stays
-		/// correct across all these camera-switching modes (Unity's own
-		/// "whichever camera is actually rendering" accessor).
+		/// IVA vs non-IVA, which is what matters: droplets on glass only exist in
+		/// the IVA and Internal camera modes, both rendering through
+		/// InternalCamera, and everything else is outside. Position comes from
+		/// Camera.main rather than FlightCamera's own camera, since it stays
+		/// correct across every one of these modes.
 		/// </summary>
 		private static void SampleCamera(WeatherSample sample)
 		{
@@ -240,13 +225,11 @@ namespace SituationalAwareness.WeatherReport
 		}
 
 		/// <summary>
-		/// WeatherDrivenSolarPanel: no compile-time reference (notes §6).
-		/// currentOutput/WeatherImpactFactor are ordinary [KSPField]s, read
-		/// via PartModule.Fields[...] like any other KSP mod would — that
-		/// part needs no .NET reflection at all, KSPField exposes private
-		/// fields too. VolumetricCloudTransmittance is a static method with
-		/// no KSPField equivalent, so that one genuinely needs
-		/// Type/MethodInfo reflection.
+		/// WeatherDrivenSolarPanel, with no compile-time reference.
+		/// currentOutput and WeatherImpactFactor are ordinary [KSPField]s, read
+		/// through PartModule.Fields like any KSP mod would and needing no .NET
+		/// reflection. VolumetricCloudTransmittance is a static method with no
+		/// KSPField equivalent, so that one does.
 		/// </summary>
 		private static void SampleWdsp(Vessel vessel, WeatherSample sample)
 		{
@@ -286,10 +269,8 @@ namespace SituationalAwareness.WeatherReport
 		}
 
 		/// <summary>
-		/// One row per raymarched cloud layer on the current body (2D-only
-		/// layers, LayerRaymarchedVolume == null, are skipped — no
-		/// SampleCoverage to call). API verified on the decompiled
-		/// Atmosphere.dll/EVEManager.dll (2026-08-17), not assumed.
+		/// One row per raymarched cloud layer on the current body. 2D-only layers
+		/// are skipped: they have no SampleCoverage to call.
 		/// </summary>
 		private static void SampleEveLayers(Vessel vessel, WeatherSample sample)
 		{
@@ -319,14 +300,11 @@ namespace SituationalAwareness.WeatherReport
 					float covHere = layer.SampleCoverage(hereWorld, out float cloudTypeHere, true);
 
 					// "Sky" sample: straight up from the vessel at mid-layer
-					// altitude, planetRadiusCheck off (notes §3 — covers
-					// high layers seen from the ground underneath them).
-					// Bug fix (in-game test 2026-08-17): a few layers (seen on
-					// "Aurora" ones) have InnerSphereRadius == OuterSphereRadius
-					// == 0 — a degenerate shell, not a real cloud sphere — which
-					// puts skyPoint at the body's own center and made
-					// SampleCoverage return NaN. Falls back to the "here" sample
-					// instead of sampling a meaningless point.
+					// altitude, with planetRadiusCheck off so a high layer is
+					// still seen from the ground underneath it. A degenerate
+					// shell (both radii 0, as some aurora layers have) would put
+					// the sample point at the body's centre and return NaN, so it
+					// falls back to the "here" sample instead.
 					float midRadius = (layer.InnerSphereRadius + layer.OuterSphereRadius) / 2f;
 					float covSky;
 					float cloudTypeSky;
@@ -348,12 +326,10 @@ namespace SituationalAwareness.WeatherReport
 					float particleField = 0f, droplets = 0f, lightning = 0f, wetSurfaces = 0f;
 					if (types != null && types.Count > 0)
 					{
-						// Bug fix (report analysis 2026-09-04): cloudType is
-						// NORMALISED 0..1, not an index — EVE's own getCloudFrac
-						// scales it by (Count - 1) before indexing. The old
-						// RoundToInt(raw) could only ever return index 0 or 1,
-						// which mislabelled exactly the interesting samples
-						// (thunderstorms came out as "Fog", snow as "Rain").
+						// cloudType is NORMALISED 0..1, not an index: EVE's own
+						// getCloudFrac scales it by (Count - 1) before indexing,
+						// and rounding the raw value would only ever name the
+						// first two types.
 						cloudTypeDensity = InterpolateDensity(types, cloudTypeRaw, out int idx);
 						typeName = types[idx].TypeName;
 						particleField = layer.GetInterpolatedCloudTypeParticleFieldDensity(cloudTypeRaw);
@@ -371,11 +347,10 @@ namespace SituationalAwareness.WeatherReport
 
 					bool fxOnly = layer.RaymarchingSettings != null && layer.RaymarchingSettings.FxOnlyLayer;
 
-					// Particle field: EVE's own render gate, replicated from the
-					// decompiled ParticleField.Update() —
-					//   t = clamp01((cov - minCov) / (maxCov - minCov))
-					//   t *= interpolated particle field density
-					// so > 0 means EVE is actually drawing particles here.
+					// Particle field: EVE's own render gate, as ParticleField.Update
+					// applies it — clamp01((cov - minCov) / (maxCov - minCov))
+					// times the interpolated density — so anything above 0 means
+					// EVE is really drawing particles here.
 					ParticleFieldConfig pf = EveLayerInfo.GetParticleFieldConfig(layer);
 					string pfName = pf != null ? pf.Name : "";
 					float fallSpeed = pf != null ? pf.FallSpeed : 0f;
@@ -402,13 +377,11 @@ namespace SituationalAwareness.WeatherReport
 		}
 
 		/// <summary>
-		/// CloudType.Density interpolated the way EVE interpolates every other
-		/// per-type value (getCloudFrac: scale the normalised 0..1 cloudType by
-		/// Count-1, lerp between the two neighbours). EVE exposes
-		/// GetInterpolatedCloudType* for particle field/droplets/lightning/wet
-		/// surfaces but NOT for Density, so it is replicated here — it is the
-		/// optical thickness, i.e. what separates a thin cirrus veil from an
-		/// overcast deck. Also returns the nearest type index for the label.
+		/// CloudType.Density interpolated the way EVE interpolates its other
+		/// per-type values: scale the normalised cloudType by Count-1 and lerp the
+		/// two neighbours. EVE ships no GetInterpolatedCloudType* for Density,
+		/// which is the optical thickness separating a cirrus veil from an
+		/// overcast deck. Also returns the nearest type index, for the label.
 		/// </summary>
 		private static float InterpolateDensity(List<CloudType> types, float cloudTypeRaw, out int nearestIndex)
 		{
@@ -427,13 +400,11 @@ namespace SituationalAwareness.WeatherReport
 	}
 
 	/// <summary>
-	/// The one piece of EVE that has no public accessor: CloudsRaymarchedVolume
-	/// keeps its ParticleField private, and ParticleField keeps the config NAME
-	/// private too — but ParticleFieldManager.GetConfig(name) is public, so a
-	/// single cached reflection hop per layer is enough to reach the whole
-	/// public ParticleFieldConfig surface. Cached per layer instance and fully
-	/// guarded: any failure just means "this layer has no particle field", never
-	/// an exception into the caller.
+	/// The one piece of EVE with no public accessor: CloudsRaymarchedVolume keeps
+	/// its ParticleField private and ParticleField keeps the config name private,
+	/// but ParticleFieldManager.GetConfig is public, so one cached reflection hop
+	/// per layer reaches the whole config surface. Fully guarded: any failure
+	/// means "this layer has no particle field", never an exception at the caller.
 	/// </summary>
 	internal static class EveLayerInfo
 	{

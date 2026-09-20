@@ -12,30 +12,29 @@ namespace SituationalAwareness.Core
 	internal struct EveLayerReading
 	{
 		public string Name;
-		/// <summary>Coverage at the vessel itself — "am I inside this layer".</summary>
+		/// <summary>Coverage at the vessel itself: am I inside this layer.</summary>
 		public float CoverageHere;
-		/// <summary>Coverage straight up at mid-layer altitude — "is this layer
-		/// between me and the sky".</summary>
+		/// <summary>Coverage straight up at mid-layer altitude: is this layer
+		/// between me and the sky.</summary>
 		public float CoverageSky;
-		/// <summary>Interpolated CloudType.Density: optical thickness per unit
-		/// length. A cirrus veil is ~0.0005, a cumulus deck ~0.012 — the single
-		/// number that explains why the survey's author called a 0.5-coverage
-		/// cirrus sky "clear".</summary>
+		/// <summary>Interpolated CloudType.Density, the optical thickness per unit
+		/// length: a cirrus veil is ~0.0005 and a cumulus deck ~0.012, which is
+		/// why coverage alone cannot tell a clear sky from an overcast one.</summary>
 		public float Density;
 		public float ThicknessM;
 		/// <summary>True for layers that render no volume at all, only effects
-		/// (particles, sound). They must not count as cloud cover — but they can
-		/// still be precipitation, which is exactly what Kerbin's snow layers are.</summary>
+		/// (particles, sound). They must not count as cloud cover, but they can
+		/// still be the precipitation.</summary>
 		public bool FxOnly;
 		/// <summary>EVE's own particle render gate at the vessel, 0..1. Already
 		/// includes the coverage thresholds and the per-cloud-type density.</summary>
 		public float PrecipIntensity;
 		/// <summary>Particle fall speed: ~12-25 for rain, ~0.3-0.8 for snow and
-		/// dust, 32 for hail. The functional rain/snow split §3 asked for.</summary>
+		/// dust, 32 for hail. The functional rain/snow split.</summary>
 		public float FallSpeed;
-		/// <summary>Particles in the field: 200k-800k for real weather, 500 for
-		/// ambient decoration like Duna-Dust-Sparse. Keeps permanent scenery
-		/// from reading as a dust storm.</summary>
+		/// <summary>Particles in the field: 200k-800k for real weather, a few
+		/// hundred for ambient decoration. Keeps permanent scenery from reading as
+		/// a dust storm.</summary>
 		public float ParticleCount;
 		/// <summary>Interpolated lightning frequency, meaningful ONLY when
 		/// HasLightning is true (EVE's own default is 1.0 for cloud types that
@@ -46,10 +45,9 @@ namespace SituationalAwareness.Core
 
 	/// <summary>
 	/// One EVE layer's time window, as EVE itself evaluates it: a clock-driven
-	/// on/off cycle anchored to UT 0 (TimeSettings.GetFadeForUT, verified on
-	/// the decompiled Atmosphere.dll — a pure function of the universal time,
-	/// no randomness, no dependence on local time or on the body's day).
-	/// Everything a forecast needs, and nothing that requires sampling.
+	/// on/off cycle anchored to UT 0 (TimeSettings.GetFadeForUT), a pure function
+	/// of universal time with no randomness and no dependence on local time or on
+	/// the body's day. Everything a forecast needs, with nothing sampled.
 	/// </summary>
 	internal struct EveLayerWindow
 	{
@@ -60,9 +58,8 @@ namespace SituationalAwareness.Core
 		public double Duration;
 		public double RepeatInterval;
 		public double FadeTime;
-		/// <summary>What this layer can drop on the vessel when open — None
-		/// for a plain cloud deck, or for a decorative particle field too thin
-		/// to count as weather.</summary>
+		/// <summary>What this layer can drop on the vessel when open; None for a
+		/// plain cloud deck, or a particle field too thin to count as weather.</summary>
 		public SaPrecipClass Precip;
 
 		/// <summary>
@@ -107,15 +104,13 @@ namespace SituationalAwareness.Core
 	/// <summary>
 	/// The only class in SA that touches EVE types. Every entry point is called
 	/// exclusively after WeatherClassifier has confirmed the assemblies are
-	/// loaded, so on an install without EVE these methods are never JITted and
-	/// the missing reference never surfaces (same soft-dependency pattern the
-	/// survey companion already proved in game, notes §6).
+	/// loaded, so on an install without EVE these methods are never JITted and the
+	/// missing reference never surfaces.
 	///
-	/// All API here was verified on the decompiled Atmosphere.dll, not assumed —
-	/// including two traps documented in notes/survey-analisi.md: the cloudType
-	/// out-value is normalised 0..1 rather than an index, and SampleCoverage
-	/// keeps returning a stale non-zero coverage for a layer whose time window
-	/// has closed, so every reading must be gated on GetFadeForUT.
+	/// Two traps in EVE's API to keep in mind: the cloudType out-value is
+	/// normalised 0..1 rather than an index, and SampleCoverage keeps returning a
+	/// stale non-zero coverage for a layer whose time window has closed, so every
+	/// reading must be gated on GetFadeForUT.
 	/// </summary>
 	internal static class EveWeatherReader
 	{
@@ -185,10 +180,9 @@ namespace SituationalAwareness.Core
 		{
 			CloudsRaymarchedVolume layer = obj.LayerRaymarchedVolume;
 
-			// Time gate FIRST, and hard: a layer outside its window keeps
-			// reporting its last coverage (EVE only refreshes the fade
-			// multipliers while the layer is enabled). The survey caught a
-			// "clear" sample where a dormant global dust storm still read 0.84.
+			// Time gate FIRST, and hard: EVE only refreshes the fade multipliers
+			// while a layer is enabled, so one outside its window keeps reporting
+			// the coverage it had when it closed.
 			TimeSettings timeSettings = layer.CloudsPQS != null ? layer.CloudsPQS.TimeSettings : null;
 			if (timeSettings != null && timeSettings.GetFadeForUT(ut) <= 0f) return default(EveLayerReading);
 
@@ -234,7 +228,7 @@ namespace SituationalAwareness.Core
 				{
 					reading.FallSpeed = pf.FallSpeed;
 					reading.ParticleCount = pf.FieldParticleCount;
-					// EVE's own gate, from the decompiled ParticleField.Update():
+					// EVE's own gate, as ParticleField.Update applies it:
 					// clamp01((coverage - min) / (max - min)) * particle density.
 					float span = pf.MaxCoverageThreshold - pf.MinCoverageThreshold;
 					if (span > 0f)
@@ -289,9 +283,9 @@ namespace SituationalAwareness.Core
 
 		/// <summary>
 		/// TimeSettings keeps every parameter private and exposes only
-		/// GetFadeForUT(ut); the five fields are read once per layer by
-		/// reflection and cached, the same way the particle-field hop is. A
-		/// layer whose settings cannot be read simply contributes no forecast.
+		/// GetFadeForUT, so the five fields are read once per layer by reflection
+		/// and cached. A layer whose settings cannot be read contributes no
+		/// forecast.
 		/// </summary>
 		private static bool TryReadWindow(CloudsObject obj, CelestialBody body, out EveLayerWindow window)
 		{
@@ -329,10 +323,10 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// What a layer can drop, by the same functional criteria the
-		/// classifier applies to what IS falling: a real-sized particle field
-		/// (WeatherClassifier.MinWeatherParticleCount), split liquid/frozen on
-		/// fall speed, frozen split snow/dust on whether the body has an ocean.
+		/// What a layer can drop, by the same functional criteria the classifier
+		/// applies to what IS falling: a real-sized particle field, split
+		/// liquid/frozen on fall speed and frozen split snow/dust on whether the
+		/// body has an ocean.
 		/// </summary>
 		private static SaPrecipClass PrecipClassOf(CloudsRaymarchedVolume layer, CelestialBody body)
 		{
@@ -343,11 +337,10 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// CloudType.Density interpolated exactly the way EVE interpolates its
-		/// other per-type values (getCloudFrac: scale the normalised 0..1
-		/// cloudType by Count-1, lerp the two neighbours). EVE ships
-		/// GetInterpolatedCloudType* for particles/droplets/lightning/wet
-		/// surfaces but not for Density, so it is replicated here.
+		/// CloudType.Density interpolated the way EVE interpolates its other
+		/// per-type values: scale the normalised cloudType by Count-1 and lerp the
+		/// two neighbours. EVE ships GetInterpolatedCloudType* for particles,
+		/// droplets and lightning, but not for Density.
 		/// </summary>
 		private static float InterpolateDensity(List<CloudType> types, float cloudType)
 		{
@@ -360,10 +353,10 @@ namespace SituationalAwareness.Core
 
 		/// <summary>
 		/// Whether this layer can produce lightning at all. EVE defaults
-		/// CloudType.lightningFrequency to 1.0 when a config does not set it,
-		/// so the interpolated value on its own would claim thunderstorms over
-		/// ordinary cumulus — the real answer is whether the layer has a
-		/// lightning config object, which is private and needs reflection.
+		/// CloudType.lightningFrequency to 1.0 when a config does not set it, so
+		/// the interpolated value alone would claim thunderstorms over ordinary
+		/// cumulus; the real answer is whether the layer has a lightning config
+		/// object, which is private and needs reflection.
 		/// </summary>
 		private static bool HasLightning(CloudsRaymarchedVolume layer)
 		{
@@ -385,9 +378,8 @@ namespace SituationalAwareness.Core
 		/// <summary>
 		/// The layer's particle field config. CloudsRaymarchedVolume keeps its
 		/// ParticleField private and ParticleField keeps the config name private,
-		/// but ParticleFieldManager.GetConfig(name) is public — so one cached
-		/// reflection hop per layer opens up the whole public config surface
-		/// (fall speed, particle count, coverage thresholds).
+		/// but ParticleFieldManager.GetConfig is public, so one cached reflection
+		/// hop per layer opens the whole config surface.
 		/// </summary>
 		private static ParticleFieldConfig GetParticleFieldConfig(CloudsRaymarchedVolume layer)
 		{
@@ -431,8 +423,7 @@ namespace SituationalAwareness.Core
 
 		/// <summary>
 		/// Dropped when the scene changes: the cache keys are EVE layer objects
-		/// that do not survive a scene reload, and nothing else here is worth
-		/// keeping across one.
+		/// that do not survive a scene reload.
 		/// </summary>
 		internal static void ClearCaches()
 		{

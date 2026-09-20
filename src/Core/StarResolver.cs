@@ -4,11 +4,10 @@ using System.Collections.Generic;
 namespace SituationalAwareness.Core
 {
 	/// <summary>
-	/// Resolves the correct star for a given body by walking the referenceBody
-	/// chain and checking Kopernicus template=Sun. Ported from RealBattery's
-	/// KopernicusStarResolver (design doc §4.1) — no Kopernicus dependency,
-	/// works with any planet pack, falls back to Planetarium.fetch.Sun when no
-	/// Kopernicus data is present (stock system).
+	/// Resolves the star for a body by walking the referenceBody chain and looking
+	/// for Kopernicus template=Sun (design doc §4.1, ported from RealBattery). No
+	/// hard Kopernicus dependency: the caller falls back to Planetarium.fetch.Sun
+	/// when no Kopernicus data is present.
 	/// </summary>
 	internal static class StarResolver
 	{
@@ -20,10 +19,9 @@ namespace SituationalAwareness.Core
 
 		/// <summary>
 		/// Try resolving the star for a body. luminosity is the Kopernicus
-		/// ScaledVersion/Light/luminosity value if present (design doc §4.3:
-		/// its exact physical meaning relative to PhysicsGlobals.SolarLuminosity
-		/// is NOT verified — do not build a flux formula from it without an
-		/// in-game cross-check, see notes/verifiche-api.md §6 and M3).
+		/// ScaledVersion/Light/luminosity value when present; its physical meaning
+		/// relative to PhysicsGlobals.SolarLuminosity is unverified (design doc
+		/// §4.3), so do not build a flux formula on it without a cross-check.
 		/// </summary>
 		public static bool TryResolveStar(CelestialBody startBody, out CelestialBody starBody, out double luminosity)
 		{

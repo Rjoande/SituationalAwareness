@@ -5,19 +5,17 @@ using UnityEngine;
 namespace SituationalAwareness.WeatherReport
 {
 	/// <summary>
-	/// The player's consent to the weather report (notes/indagine-meteo.md
-	/// §8.3, trigger reworked 2026-09-10): the disclaimer below is shown the
-	/// first time the SA setting is switched on, and until "Accept" has been
-	/// pressed nothing is read or written by this companion.
+	/// The player's consent to the weather report: the disclaimer below is shown
+	/// the first time the SA setting is switched on, and until "Accept" has been
+	/// pressed this companion reads and writes nothing.
 	///
-	/// Consent is GLOBAL — one file in PluginData, not a per-save flag — because
-	/// it belongs to the person, not to the career: accepted once, another save
-	/// only needs the setting switched on. It is tied to the disclaimer's
-	/// version, so a changed text asks again. Declining stores nothing, which
-	/// is exactly why switching the setting on again shows the dialog again.
+	/// Consent is GLOBAL, one file in PluginData rather than a per-save flag,
+	/// because it belongs to the person and not to the career. It is tied to the
+	/// disclaimer's version, so changed text asks again, and declining stores
+	/// nothing, which is why switching the setting on again asks again too.
 	///
-	/// English only, not localized (decision §8.3, confirmed 2026-09-10): one
-	/// authoritative wording of what the player is agreeing to.
+	/// English only, not localized: one authoritative wording of what the player
+	/// is agreeing to.
 	/// </summary>
 	internal static class ReportConsent
 	{

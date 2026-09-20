@@ -7,11 +7,10 @@ namespace SituationalAwareness.WeatherReport
 	/// <summary>
 	/// Minimal UI helpers for the companion.
 	///
-	/// SA's own SaUi is internal to its assembly and stays that way — the whole
-	/// point of SaExtensionPoint is that a companion touches ONE public class,
-	/// not SA's internals. The cost is this small duplication: the palette below
-	/// mirrors SaUi's so the report window does not look foreign next to the
-	/// panel it hangs off. If SA's palette ever changes, these follow by hand.
+	/// SA's own SaUi is internal to its assembly and stays that way: the point of
+	/// SaExtensionPoint is that a companion touches one public class, not SA's
+	/// internals. The cost is this duplication — the palette below mirrors SaUi's
+	/// so the window does not look foreign, and follows it by hand if it changes.
 	/// </summary>
 	internal static class ReportUi
 	{
@@ -115,9 +114,8 @@ namespace SituationalAwareness.WeatherReport
 	/// <summary>
 	/// Drag-to-move for the report window, and the KSP input lock while the
 	/// pointer is over the header it is attached to. Typing is covered
-	/// separately: WeatherReportWindow holds its own lock while the note
-	/// field has focus (2026-09-14), since the pointer is anywhere but the
-	/// header at that moment.
+	/// separately, by a lock WeatherReportWindow holds while the note field has
+	/// focus: the pointer is anywhere but the header at that moment.
 	/// </summary>
 	internal class ReportWindowDrag : MonoBehaviour, IDragHandler, IPointerEnterHandler, IPointerExitHandler
 	{

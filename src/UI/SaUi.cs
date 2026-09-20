@@ -4,12 +4,12 @@ using UnityEngine.UI;
 namespace SituationalAwareness.UI
 {
 	/// <summary>
-	/// Code-built UGUI factory for the M2 telemetry skin (design doc §6.8):
+	/// Code-built UGUI factory for the telemetry skin (design doc §6.8):
 	/// amber-on-dark avionics palette, Consolas with a stock-font fallback.
 	/// </summary>
 	internal static class SaUi
 	{
-		// Palette (design doc §6.8, from the approved mockup).
+		// Palette (design doc §6.8).
 		public static readonly Color Panel = FromHex("0f1517");
 		public static readonly Color PanelEdge = FromHex("1e2a2e");
 		public static readonly Color HeaderBg = FromHex("0a0e0f");
@@ -23,30 +23,23 @@ namespace SituationalAwareness.UI
 		public static readonly Color LedGreen = FromHex("5ad46a");
 		public static readonly Color LedYellow = FromHex("ffd23e");
 		public static readonly Color LedOff = FromHex("3a444a");
-		// Semantic alias for LedYellow (M3 restyling): a "getting close, not
-		// critical yet" state on data rows (temperature warm bands) — same
-		// hex, but named for what it means here rather than "led yellow".
+		// Semantic alias for LedYellow: "getting close, not critical yet" on a
+		// data row. Same hex, named for what it means rather than for the led.
 		public static readonly Color Warn = FromHex("ffd23e");
 
-		// Hex strings for inline rich-text spans (Text.text = "<color=#..>"),
-		// kept in sync with the Color constants above by construction — one
-		// literal per color, not scattered magic strings at each call site.
+		// Hex strings for inline rich-text spans (Text.text = "<color=#..>"): one
+		// literal per colour, instead of magic strings at each call site.
 		public const string TextHex = "d8e2e4";
 		public const string TextDimHex = "7d8e93";
 		public const string CyanHex = "4fd1c5";
 
-		// Orbit ring dial (bug fix, test M2 fase 8: lit/shadow used two
-		// similarly-dark grays, indistinguishable at a glance).
+		// Orbit ring dial: lit and shadow must stay far apart in brightness to be
+		// told apart at a glance.
 		public static readonly Color OrbitLit = FromHex("9fd0f0");
 		public static readonly Color OrbitShadow = FromHex("152238");
 		public static readonly Color OrbitMarker = Color.white;
-		// Brightened from the original Inset (#16202a — "ancora molto dim",
-		// test M2 retest) for the orbit ring's planet disc default.
 		public static readonly Color OrbitPlanetDefault = FromHex("324254");
 
-		// Test M2 (design doc §6.8): edit this to a garbage name (e.g.
-		// "NoSuchFontXYZ") and rebuild to exercise the fallback path in
-		// game — restore to "Consolas" afterwards. See notes/test-m2.md.
 		private const string PrimaryFontName = "Consolas";
 
 		private static Font font;
@@ -156,7 +149,10 @@ namespace SituationalAwareness.UI
 			return button;
 		}
 
-		/// <summary>A row that reacts to clicks (unit cycling, design doc §6.4) — invisible button stretched over the whole row. Must sit outside the row's own HorizontalLayoutGroup sizing (ignoreLayout) or the layout group would squeeze it into its own slot instead of covering the row.</summary>
+		/// <summary>A row that reacts to clicks (unit cycling, design doc §6.4):
+		/// an invisible button stretched over the whole row. It must sit outside
+		/// the row's HorizontalLayoutGroup sizing (ignoreLayout), or the group
+		/// would squeeze it into a slot of its own instead of covering the row.</summary>
 		public static Button ClickCatcher(Transform parent, UnityEngine.Events.UnityAction onClick)
 		{
 			Image image = Go("ClickCatcher", parent).AddComponent<Image>();

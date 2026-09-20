@@ -11,13 +11,10 @@ namespace SituationalAwareness.Core
 	internal static class SaReadoutProvider
 	{
 		/// <summary>
-		/// M3 point 5 (design doc §5.5/§9): latitude above which longitude
-		/// (and azimuth/local time/timezone/dial derived from it) is treated
-		/// as numerically unstable. Retuned to 87.5° (retest 2026-07-28,
-		/// empirical observation in game: the "midnight sun" effect visibly
-		/// starts around there) — the original 89° estimate came from a
-		/// pure elevation-amplitude argument (~cos(89°) ≈ 1° swing), tighter
-		/// than what actually reads as "never gets dark" in practice.
+		/// Latitude above which longitude — and azimuth, local time, timezone and
+		/// the dial with it — is treated as numerically unstable (design doc §5.5).
+		/// Tuned by eye rather than from the elevation amplitude alone: this is
+		/// about where the sky visibly stops getting dark.
 		/// </summary>
 		public const double NearPoleLatitudeThresholdDeg = 87.5;
 
@@ -35,26 +32,19 @@ namespace SituationalAwareness.Core
 			r.VesselName = vessel.vesselName;
 
 			CelestialBody body = vessel.mainBody;
-			// displayName (verified 2026-07-19: CelestialBody.bodyDisplayName,
-			// aliased as .displayName), not .bodyName/.name — the latter are
-			// internal identifiers ("Sun") that ignore the pack's own chosen
-			// display name ("Kerbol"). Same field WDSP uses for its own star
-			// picker on the decompiled source. "^N" is a raw KSP localization
-			// grammar tag baked into the localized string itself (confirmed:
-			// WDSP strips the exact same suffix) — not something Localizer
-			// removes for us, so we strip it too (retest 2026-07-21: showed
-			// up as "KERBIN^N" in the UI).
+			// displayName, not bodyName/name: the latter are internal identifiers
+			// ("Sun") that ignore the pack's own display name ("Kerbol"). The
+			// grammar tag is baked into the localized string and Localizer does
+			// not strip it, so StripGenderTag does.
 			r.BodyName = CleanDisplayName(body.displayName);
 			r.BodyNameInternal = body.bodyName;
 			r.BodyHasAtmosphere = body.atmosphere;
 			r.BodyIsStar = body.isStar;
-			// bodyName (internal identifier), not displayName — only the
-			// root star must keep the exact internal name "Sun" in any
-			// planet pack; a secondary star (e.g. Grannus) never carries it
-			// (bug fix 2026-07-24, see SaReadout.BodyIsSun doc comment).
+			// bodyName, not displayName: only the root star keeps the internal
+			// name "Sun" in any planet pack (see SaReadout.BodyIsSun).
 			r.BodyIsSun = string.Equals(body.bodyName, "Sun", System.StringComparison.OrdinalIgnoreCase);
-			// PSystemManager.OrbitRendererDataCache, not body.orbitDriver —
-			// see SaReadout.BodyMapColorRaw doc comment (bug fix 2026-07-22).
+			// OrbitRendererDataCache, not body.orbitDriver: see
+			// SaReadout.BodyMapColorRaw.
 			r.BodyMapColorRaw = PSystemManager.OrbitRendererDataCache != null
 				&& PSystemManager.OrbitRendererDataCache.TryGetValue(body, out OrbitRendererData orbitRenderData)
 				? orbitRenderData.orbitColor
@@ -67,28 +57,25 @@ namespace SituationalAwareness.Core
 			r.StarName = star != null ? CleanDisplayName(star.displayName) : "?";
 
 			r.IsStarLocked = SaModeSelector.IsTidalLockedOnStar(body);
-			// Generic "this body doesn't rotate relative to what it orbits"
-			// badge — shown regardless of mode/vessel situation. Bug found
-			// in M1 retest (fase 5): excluding the star-locked case here
-			// meant a vessel ORBITING a star-locked body (Moho) got no
-			// LOCKED indication at all, even though it's just as true as
-			// for a moon locked on its planet.
+			// Generic "this body does not rotate relative to what it orbits"
+			// badge, shown whatever the mode: it is as true of a star-locked body
+			// seen from orbit as of a moon locked on its planet.
 			r.BodyTidallyLocked = body.tidallyLocked;
 			r.SolarDayLengthSec = BodyClock.SolarDayLengthAbsSeconds(body);
 			r.Mode = SaModeSelector.Select(vessel);
 			r.BodyChain = BuildBodyChain(body);
 			BuildGravity(ref r, vessel, body);
 			BuildHullTemperature(ref r, vessel);
-			// Self-throttled to ~1 Hz internally (sampling every cloud layer
-			// costs CPU texture reads) and a no-op without EVE installed.
+			// Self-throttled to ~1 Hz internally, since sampling every cloud layer
+			// costs CPU texture reads; a no-op without EVE installed.
 			r.Weather = WeatherClassifier.Classify(vessel, r.UT);
 
 			r.ExtTempUnlocked = SaScienceGate.IsUnlocked(SaScienceGate.FieldExtTemp, body);
 			r.PressureUnlocked = SaScienceGate.IsUnlocked(SaScienceGate.FieldPressure, body);
 			r.GravityUnlocked = SaScienceGate.IsUnlocked(SaScienceGate.FieldGravity, body);
-			// No atmosphere, no atmosphere analysis to run: a geyser plume on
-			// an airless moon (the only weather such a body can show) is not
-			// something a barometer could ever have told you about.
+			// No atmosphere, no atmospheric analysis to credit: the plume that is
+			// the only weather an airless body can show is not something an
+			// experiment could have told you about.
 			r.WeatherUnlocked = !body.atmosphere || SaScienceGate.IsUnlocked(SaScienceGate.FieldWeather, body);
 
 			r.IsHomeBody = body.isHomeWorld;
@@ -100,10 +87,8 @@ namespace SituationalAwareness.Core
 			r.AltitudeAglValid = vessel.heightFromTerrain >= 0.0;
 			r.AltitudeAglM = vessel.heightFromTerrain;
 			r.PressureKPa = vessel.staticPressurekPa;
-			// Kelvin (verified M0 addendum: PhysicsGlobals.spaceTemperature = 4.0,
-			// Kerbin's atmosphereTemperatureSeaLevel = 288.0 — these are Kelvin
-			// values, not Celsius). atmosphericTemperature on purpose, never
-			// externalTemperature (that one folds in reentry shock heating).
+			// Kelvin. atmosphericTemperature on purpose, never externalTemperature,
+			// which folds in reentry shock heating.
 			r.ExternalTemperatureK = vessel.atmosphericTemperature;
 			r.BiomeName = ScienceUtil.GetExperimentBiomeLocalized(body, vessel.latitude, vessel.longitude);
 
@@ -113,11 +98,9 @@ namespace SituationalAwareness.Core
 				r.SunAzimuthDeg = SolarMath.SolarAzimuthDeg(vessel, star);
 			}
 
-			// M1: stock field directly. The Kopernicus "luminosity" value
-			// StarResolver can read is not verified to be an absolute-watts
-			// luminosity (design doc §4.3, notes/verifiche-api.md §6) — a
-			// Grannus-system cross-check is deferred to M3 before building
-			// any inverse-square override on top of it.
+			// Stock field, used directly: the Kopernicus luminosity StarResolver
+			// can read is not confirmed to be an absolute figure (design doc
+			// §4.3), so no inverse-square override is built on it.
 			r.SolarFluxWm2 = vessel.solarFlux;
 
 			if (vessel.Connection != null)
@@ -149,14 +132,11 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Local time AT THE KSC'S ACTUAL COORDINATES on the home body
-		/// (bug fixed after M1 test fase 1: this used to be "UT mod day",
-		/// which just repeated the UT row and ignored the KSC's real
-		/// longitude — the KSC sits at a nonzero timezone like anywhere
-		/// else). SpaceCenter.Instance.Latitude/Longitude are computed from
-		/// the actual in-scene KSC transform (notes/verifiche-api.md
-		/// addendum), so this is correct even when a planet pack relocates
-		/// the KSC — no hardcoded coordinates anywhere.
+		/// Local time at the KSC's ACTUAL coordinates on the home body, which sit
+		/// in a nonzero timezone like anywhere else — not "UT mod day", which
+		/// would just repeat the UT row. SpaceCenter.Instance derives them from
+		/// the in-scene KSC transform, so a pack that relocates the KSC is
+		/// followed with no hardcoded coordinates.
 		/// </summary>
 		private static void BuildKscTime(ref SaReadout r, int n, double zoneWidth)
 		{
@@ -173,9 +153,8 @@ namespace SituationalAwareness.Core
 				? homeStar
 				: (Planetarium.fetch != null ? Planetarium.fetch.Sun : FlightGlobals.Bodies[0]);
 
-			// KSC is always ON the home body by construction — always safe to
-			// use the calibrate-once path (MeanTimeCalibration), pure UT
-			// arithmetic from here on, no per-tick trig (retest 2026-07-21).
+			// The KSC is on the home body by construction, so the calibrate-once
+			// path always applies: pure UT arithmetic, no per-tick trig.
 			double homeSolarDay = BodyClock.SolarDayLengthAbsSeconds(home);
 			int kIndex = SolarMath.ZoneIndex(sc.Longitude, zoneWidth);
 			double zone0Sec = MeanTimeCalibration.Zone0Seconds(home, effectiveStar, r.UT, homeSolarDay);
@@ -203,11 +182,9 @@ namespace SituationalAwareness.Core
 			double zoneCenter = SolarMath.ZoneCenterLongitude(vessel.longitude, zoneWidth);
 			r.TimeZoneIndex = SolarMath.ZoneIndex(vessel.longitude, zoneWidth);
 
-			// M3 point 6 (go 2026-07-28): mean-time calibration, extended
-			// from home-only to every body — LOCAL TIME is the civil/mean
-			// clock everywhere now, not just home (apparent solar time on
-			// non-home bodies used to leak the raw DayFraction here; that
-			// live value moved to the new SOLAR TIME fields below instead).
+			// Mean-time calibration on every body: LOCAL TIME is the civil clock
+			// everywhere, and the live apparent value lives in the SOLAR TIME
+			// fields below instead.
 			double zone0Sec = MeanTimeCalibration.Zone0Seconds(body, star, r.UT, r.SolarDayLengthSec);
 			double zoneSec = Wrap(zone0Sec + r.TimeZoneIndex * (r.SolarDayLengthSec / n), r.SolarDayLengthSec);
 			double f = zoneSec / r.SolarDayLengthSec;
@@ -240,15 +217,11 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// SOLAR TIME (M3 point 6, go 2026-07-28): TRUE/apparent solar time
-		/// at the vessel's EXACT longitude — never zone-quantized, never
-		/// mean-time-calibrated, unlike LOCAL TIME above. This is exactly
-		/// the plain live `DayFraction` formula LOCAL TIME itself used to
-		/// use on non-home bodies before mean-time calibration was extended
-		/// to everywhere. Same countdown logic as LOCAL TIME's own
-		/// alba/tramonto (tSunset/tSunrise), just fed the exact-longitude
-		/// hour angle — kept in sync with <see cref="TryBuildSolarCountdownFast"/>
-		/// by using the exact same formula shape.
+		/// TRUE/apparent solar time at the vessel's exact longitude: never
+		/// zone-quantized and never mean-time-calibrated, unlike LOCAL TIME above.
+		/// The sunrise/sunset countdown is LOCAL TIME's own logic fed the
+		/// exact-longitude hour angle, in the same formula shape as
+		/// <see cref="TryBuildSolarCountdownFast"/> so the two stay in step.
 		/// </summary>
 		private static void BuildSolarTime(ref SaReadout r, int n, Vessel vessel, CelestialBody body,
 			CelestialBody star, double subsolarLon, double rate)
@@ -290,27 +263,9 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Shared by BuildOrbit (throttled, full readout) and
-		/// TryBuildOrbitTimerFast (unthrottled, SaWindow's per-tick "T−"/
-		/// Period refresh — retest 2026-07-27: the 10Hz panel throttle made
-		/// the orbit timer feel laggy right after a long burn reshaped the
-		/// orbit) — one formula, so the two paths can never disagree.
-		///
-		/// Escape trajectory override: verified on the decompiled Orbit.cs/
-		/// PatchedConicSolver.cs — `patchEndTransition == ESCAPE` means the
-		/// CURRENT patch (always patch 0, recomputed every frame for the
-		/// active vessel regardless of maneuver nodes) ends by leaving the
-		/// SoI, at `EndUT`. On such a patch the eclipse/light transition
-		/// time from OrbitIllumination.Status is not necessarily wrong
-		/// numerically, but it's meaningless: either genuinely infinite
-		/// (hyperbolic, `orbit.period` itself is PositiveInfinity per
-		/// Orbit.cs) or a finite countdown to a crossing that will never
-		/// happen because the vessel leaves this SoI first (still
-		/// elliptical, e&lt;1, but apoapsis beyond the SoI). Both cases are
-		/// replaced by a countdown to the actual SoI change, and the period
-		/// is forced to infinite (the stock UI keeps showing the raw
-		/// two-body value here, which is misleading — SA deliberately
-		/// doesn't).
+		/// Shared by BuildOrbit and the unthrottled TryBuildOrbitTimerFast, so the
+		/// two paths cannot disagree. patchEndTransition == ESCAPE triggers the
+		/// override described on SaReadout.NextOrbitEventIsSoiChange.
 		/// </summary>
 		private static void ComputeOrbitTimer(Vessel vessel, double eclipseTransitionSec, bool inEclipseNow,
 			out double timeToNextEventSec, out bool nextEventIsEclipse, out bool nextEventIsSoiChange, out double orbitPeriodSec)
@@ -331,15 +286,11 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Cheap, unthrottled slice of BuildOrbit for SaWindow's fast timer
-		/// refresh (retest 2026-07-27). OrbitIllumination.Status and the
-		/// patched-conic fields it reads are pure O(1) trig/field access —
-		/// safe to call every physics tick, unlike the full Build() (which
-		/// walks vessel.parts for HULL TEMP, see BuildHullTemperature).
-		/// StarResolver.TryResolveStar is cache-backed after the first call
-		/// per body, so re-resolving the star here every tick is cheap too.
-		/// Returns false only if there's no valid orbit context (mirrors
-		/// Build()'s own guard).
+		/// Cheap, unthrottled slice of BuildOrbit for the fast timer refresh:
+		/// OrbitIllumination.Status and the patched-conic fields are O(1), and
+		/// TryResolveStar is cache-backed, so this is safe every physics tick —
+		/// unlike the full Build(), which walks vessel.parts for HULL TEMP.
+		/// Returns false only when there is no valid orbit context.
 		/// </summary>
 		public static bool TryBuildOrbitTimerFast(Vessel vessel, out double timeToNextEventSec,
 			out bool nextEventIsEclipse, out bool nextEventIsSoiChange, out double orbitPeriodSec, out bool bodyIsStar)
@@ -366,14 +317,11 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Cheap, unthrottled slice of BuildSolarTime for SaWindow's fast
-		/// per-frame refresh (M3 point 6, go 2026-07-28: user flagged the
-		/// same "will 10Hz keep up" concern already solved for the orbit
-		/// timer — a fast-moving vessel changes longitude continuously, so
-		/// the exact-position sunrise/sunset countdown needs the same
-		/// unthrottled treatment). Same formula shape as BuildSolarTime's
-		/// own countdown, pure O(1) trig — safe every rendered frame, unlike
-		/// the full Build() (walks vessel.parts for HULL TEMP).
+		/// Cheap, unthrottled slice of BuildSolarTime for the fast per-frame
+		/// refresh: a moving vessel changes longitude continuously, so its
+		/// exact-position sunrise/sunset countdown needs the same unthrottled
+		/// treatment as the orbit timer. Same formula shape as BuildSolarTime's
+		/// own countdown and pure O(1) trig.
 		/// </summary>
 		public static bool TryBuildSolarCountdownFast(Vessel vessel, out double timeToNextEventSec, out bool nextEventIsSunrise)
 		{
@@ -435,29 +383,20 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Strips the Lingoona Grammar gender tag KSP bakes into localized
-		/// body names (bug fix 2026-07-24: NOT a fixed "^N" — the tag letter
-		/// is the grammatical gender of that specific word in the active
-		/// language, e.g. confirmed on the installed it-it dictionary:
-		/// "Kerbin^N" but "Sole^M" — a plain `Replace("^N","")` (what WDSP's
-		/// own star picker does too) silently fails on anything not tagged
-		/// N). `LocalizeRemoveGender()` is KSP's own extension method
-		/// (`LingoonaGrammarExtensions.cs`, verified on the decompiled
-		/// source): cuts from the LAST '^' onward regardless of the letter,
-		/// safe no-op if there's no tag at all. Covers both an explicit
-		/// literal displayName (passes through Localizer.Format unresolved)
-		/// and a loc-key reference (resolved to whatever the active
-		/// language's dictionary entry says, tag included) — Format()
-		/// either returns the input verbatim (key not found) or the
-		/// dictionary value (key found), and this runs after that point
-		/// either way.
+		/// Strips the Lingoona grammar tag KSP bakes into localized body names.
+		/// The tag letter is the word's grammatical gender in the active language
+		/// ("Kerbin^N" but "Sole^M"), so a plain Replace("^N", "") silently fails
+		/// on everything else; KSP's own LocalizeRemoveGender() cuts from the last
+		/// '^' whatever the letter, and is a no-op when there is no tag. Runs
+		/// after Localizer.Format, so it covers both a literal displayName and a
+		/// resolved loc key.
 		/// </summary>
 		internal static string CleanDisplayName(string raw)
 		{
 			return string.IsNullOrEmpty(raw) ? raw : raw.LocalizeRemoveGender();
 		}
 
-		/// <summary>Star -> ... -> current body, star included (footer chain, design doc §5 rework).</summary>
+		/// <summary>Star -> ... -> current body, star included (footer chain, design doc §5).</summary>
 		private static CelestialBody[] BuildBodyChain(CelestialBody body)
 		{
 			List<CelestialBody> chain = new List<CelestialBody>(4);
@@ -474,14 +413,10 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Verified on the decompiled ModuleEnviroSensor (SensorType.GRAV) +
-		/// FlightGlobals.getGeeForceAtPosition: the live reading is a real
-		/// acceleration in m/s^2 (gMagnitudeAtCenter is GM in SI units, not
-		/// pre-scaled to "g" despite the rest of the stock UI using g's
-		/// elsewhere), gated by the SAME range check the stock part uses
-		/// (beyond 3 body radii it has no reading). GeeASL is already in g's,
-		/// so the fixed ASL value needs the same SI conversion constant the
-		/// game itself uses (PhysicsGlobals.GravitationalAcceleration).
+		/// The live reading is a real acceleration in m/s^2, under the same range
+		/// check the stock gravimeter uses: beyond 3 body radii it has none.
+		/// GeeASL is already in g, so the fixed ASL figure is converted with the
+		/// game's own PhysicsGlobals.GravitationalAcceleration.
 		/// </summary>
 		private static void BuildGravity(ref SaReadout r, Vessel vessel, CelestialBody body)
 		{
@@ -494,48 +429,9 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// skinThermalMass-weighted average of skinTemperature across every
-		/// part (verified on the decompiled Part.cs: `skinThermalMass`/
-		/// `skinTemperature`/`skinMaxTemp` are all public). HULL TEMP names
-		/// the exterior shell, and the skin layer is what actually responds
-		/// to reentry/hypersonic heating; the core lags far behind via slow
-		/// internal conduction (`skinToInternalFlux`). skinThermalMass is a
-		/// genuinely separate quantity from `thermalMass`, not an
-		/// approximation of it — verified on the decompiled
-		/// FlightIntegrator: once corrected, `thermalMass = Max(thermalMass
-		/// - skinThermalMass, 0.1)`, i.e. KSP itself treats `thermalMass` as
-		/// internal-only. Weighting by mass keeps the same physical logic as
-		/// the original core-based design (different materials, different
-		/// specific heat, thermalMass/skinThermalMass already fold that in)
-		/// — just applied to the layer that's actually informative here.
-		///
-		/// Bug fix 2026-07-27, round 2 (test M3 retest, user follow-up: "in
-		/// effetti dovrebbe essere media pesata di SkinTemperature, non
-		/// core"): round 1 only fixed HullTempWorstRatio (the color) to
-		/// consider skin, leaving the displayed VALUE core-weighted — a
-		/// mismatch that could show a cool core reading in red/yellow
-		/// (color driven by skin) during exactly the reentry scenario this
-		/// row exists for. Switching the value itself to skin removes the
-		/// mismatch and makes HULL TEMP responsive to the same event its
-		/// color already reacts to.
-		///
-		/// HullTempWorstRatio stays `max(temperature/maxTemp,
-		/// skinTemperature/skinMaxTemp)` (unchanged from round 1) and
-		/// SEPARATE from the average on purpose (design discussion
-		/// 2026-07-26): a single small part near its max while the rest of
-		/// a heavy vessel stays cool would be invisible in a weighted
-		/// average, so the color-driving signal is the single worst ratio
-		/// across all parts, not the average's own ratio. Verified on the
-		/// decompiled `Part.HeatGaugeUpdate()` (stock heat gauge overlay)
-		/// and the overheat-explosion roll in `FlightIntegrator`: both use
-		/// exactly this max-of-core-and-skin formula. skinMaxTemp defaults
-		/// to maxTemp at part init if left at its own -1 sentinel, so it
-		/// should never be &lt;=0 in flight, but the guard costs nothing.
-		///
-		/// Guards: parts with skinTemperature &lt; 0 (Part.cs default, never
-		/// updated) or maxTemp &lt;= 0 are skipped entirely; if no part
-		/// qualifies (e.g. skinThermalMass sums to ~0), falls back to
-		/// vessel.rootPart alone.
+		/// Both quantities are described on SaReadout.HullTempK. Guards: parts with
+		/// skinTemperature &lt; 0 (the never-updated default) or maxTemp &lt;= 0 are
+		/// skipped, and if none qualifies this falls back to the root part alone.
 		/// </summary>
 		private static void BuildHullTemperature(ref SaReadout r, Vessel vessel)
 		{
@@ -571,7 +467,8 @@ namespace SituationalAwareness.Core
 			r.HullTempWorstRatio = worstRatio;
 		}
 
-		/// <summary>max(core, skin) ratio for one part — see BuildHullTemperature's 2026-07-27 doc comment for why both layers matter.</summary>
+		/// <summary>max(core, skin) ratio for one part; see BuildHullTemperature
+		/// for why both layers matter.</summary>
 		private static double WorstPartRatio(Part p)
 		{
 			double coreRatio = p.temperature / p.maxTemp;
@@ -581,11 +478,9 @@ namespace SituationalAwareness.Core
 
 		private static SaSignalLevel ToSignalLevel(CommNet.SignalStrength s)
 		{
-			// Stock thresholds (notes/verifiche-api.md §7): >0.75 Green,
-			// >0.5 Yellow, >0.25 Orange, >1e-9 Red, else None. Refined after
-			// M1 feedback: keep "no connection at all" (None) visually
-			// distinct (grey/off) from "connected but very weak" (Red) —
-			// collapsing them together hid a real state change.
+			// Stock thresholds: >0.75 Green, >0.5 Yellow, >0.25 Orange, >1e-9 Red,
+			// else None. None stays distinct from Red, since "no connection at
+			// all" and "connected but very weak" are different states.
 			switch (s)
 			{
 				case CommNet.SignalStrength.Green:

@@ -5,15 +5,14 @@ using UnityEngine;
 namespace SituationalAwareness.Core
 {
 	/// <summary>
-	/// Ties a readout to science actually done on the body you are at (design
-	/// doc "future" idea, go 2026-09-10): the panel shows the outside
-	/// temperature once a thermometer reading from this body has been credited,
-	/// pressure after a barometer reading, and so on. A number you have not
-	/// measured yet shows as "???".
+	/// Ties a readout to science actually done on the body you are at: the panel
+	/// shows the outside temperature once a thermometer reading from this body has
+	/// been credited, pressure after a barometer reading, and so on. A number you
+	/// have not measured yet shows as "???".
 	///
-	/// Config-driven, one node per (field, experiment) pair, several nodes on
-	/// the same field OR together — so a pack that adds its own instruments
-	/// can open a field with a ModuleManager patch and no code change:
+	/// Config-driven, one node per (field, experiment) pair, several nodes on the
+	/// same field OR together, so a pack that adds its own instruments can open a
+	/// field with a ModuleManager patch and no code change:
 	///
 	/// <code>
 	/// SA_SCIENCE_GATE
@@ -23,15 +22,14 @@ namespace SituationalAwareness.Core
 	/// }
 	/// </code>
 	///
-	/// "Done" means CREDITED (ScienceSubject.science &gt; 0), not merely run:
-	/// KSP registers a subject the moment an experiment is deployed, so
-	/// existence alone would open a field for a result that was then thrown
-	/// away (verified on the decompiled ResearchAndDevelopment.getScienceSubject).
-	/// Situation and biome are ignored on purpose — one thermometer reading
-	/// anywhere on Duna is enough to know Duna's air.
+	/// "Done" means CREDITED (ScienceSubject.science &gt; 0), not merely run: KSP
+	/// registers a subject the moment an experiment is deployed, so existence
+	/// alone would open a field for a result that was then thrown away. Situation
+	/// and biome are ignored: one thermometer reading anywhere on Duna is enough
+	/// to know Duna's air.
 	///
-	/// Off in Sandbox (there is no R&amp;D to hold subjects), off when the
-	/// player turns it off, and open for any field no config gates.
+	/// Off in Sandbox (no R&amp;D to hold subjects), off when the player turns it
+	/// off, and open for any field no config gates.
 	/// </summary>
 	internal static class SaScienceGate
 	{
@@ -45,21 +43,18 @@ namespace SituationalAwareness.Core
 		/// <summary>field -> experiment ids that open it (OR).</summary>
 		private static Dictionary<string, List<string>> gates;
 
-		// Per-body answers, rebuilt on any science event: GetSubjects() copies
-		// the whole subject dictionary every call, not something to do at the
-		// panel's refresh rate.
+		// Per-body answers, rebuilt on any science event: GetSubjects() copies the
+		// whole subject dictionary every call, too costly at the refresh rate.
 		private static readonly Dictionary<string, bool> Answers = new Dictionary<string, bool>();
 		private static string answersBody;
 		private static bool eventsHooked;
 		private static string[] situationNames;
 
-		/// <summary>True when the panel may show this field for this body.</summary>
 		internal static bool IsUnlocked(string field, CelestialBody body)
 		{
 			if (!SaParams.GateOnScience) return true;
 			if (body == null) return true;
-			// Sandbox: no R&D instance, nothing to gate on. Science/career
-			// always have one in flight.
+			// Sandbox: no R&D instance, nothing to gate on.
 			if (ResearchAndDevelopment.Instance == null) return true;
 
 			if (gates == null) Load();
@@ -80,8 +75,8 @@ namespace SituationalAwareness.Core
 			}
 			catch (Exception e)
 			{
-				// A gate that cannot be evaluated opens rather than hiding
-				// a readout on a bug of ours.
+				// A gate that cannot be evaluated opens, rather than hiding a
+				// readout because of a bug of ours.
 				Debug.LogWarning("[SA] science gate lookup failed for " + field + ": " + e.Message);
 				unlocked = true;
 			}
@@ -90,9 +85,8 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Subject ids are "experimentId@BodyNameSituationBiome" (verified on
-		/// the decompiled ScienceSubject constructor). The situation name must
-		/// follow the body name so that a body whose name is a prefix of
+		/// Subject ids are "experimentId@BodyNameSituationBiome". A situation name
+		/// must follow the body name, so that a body whose name is a prefix of
 		/// another's does not match its subjects.
 		/// </summary>
 		private static bool AnyCredited(List<string> experiments, CelestialBody body)
@@ -149,8 +143,8 @@ namespace SituationalAwareness.Core
 
 		private static void OnScienceChanged(float amount, TransactionReasons reason) => Answers.Clear();
 
-		/// <summary>Fresh flight scene: drop the config (a ModuleManager reload
-		/// mid-session) and every cached answer.</summary>
+		/// <summary>Drops the config, picking up a mid-session ModuleManager
+		/// reload, along with every cached answer.</summary>
 		internal static void Reset()
 		{
 			gates = null;

@@ -8,10 +8,9 @@ namespace SituationalAwareness.Core
 	public enum SaPhaseTidalLock { Day, Terminator, Night }
 
 	/// <summary>
-	/// Local-time / day-phase math (design doc §3, §4.2, §5.3). Longitudes
-	/// throughout are degrees, normalized to (-180, 180]. Never assumes stock
-	/// body physics — everything is read from the CelestialBody/star at
-	/// runtime, so this is planet-pack-safe by construction.
+	/// Local-time and day-phase math (design doc §3, §4.2, §5.3). Longitudes are
+	/// degrees normalized to (-180, 180]. Nothing about stock body physics is
+	/// assumed: everything is read from the CelestialBody and star at runtime.
 	/// </summary>
 	internal static class SolarMath
 	{
@@ -29,7 +28,6 @@ namespace SituationalAwareness.Core
 			return value;
 		}
 
-		/// <summary>Normalizes a longitude to (-180, 180].</summary>
 		public static double NormalizeLon(double lonDeg)
 		{
 			double l = lonDeg % 360.0;
@@ -38,7 +36,6 @@ namespace SituationalAwareness.Core
 			return l;
 		}
 
-		/// <summary>Wraps a degree value to [0, 360).</summary>
 		public static double WrapDeg(double deg)
 		{
 			double d = deg % 360.0;
@@ -46,7 +43,7 @@ namespace SituationalAwareness.Core
 			return d;
 		}
 
-		/// <summary>Signed shortest angular delta a→b in degrees, in (-180, 180]. Positive = b is east of a.</summary>
+		/// <summary>Signed shortest delta a→b; positive = b is east of a.</summary>
 		public static double DeltaLon(double aDeg, double bDeg)
 		{
 			return NormalizeLon(bDeg - aDeg);
@@ -60,8 +57,7 @@ namespace SituationalAwareness.Core
 		/// <summary>
 		/// Fraction of the local solar day elapsed (0 = midnight, 0.5 = noon),
 		/// design doc §3.2. GetLongitude already encodes the body's rotation
-		/// direction (notes/verifiche-api.md §2) — no manual retrograde
-		/// correction needed here.
+		/// direction, so no retrograde correction is needed here.
 		/// </summary>
 		public static double DayFraction(double observerLonDeg, double subsolarLonDeg)
 		{
@@ -69,7 +65,7 @@ namespace SituationalAwareness.Core
 			return diff / 360.0;
 		}
 
-		/// <summary>Center longitude of the timezone slice containing lonDeg (design doc §3.3).</summary>
+		/// <summary>Centre longitude of the timezone slice holding lonDeg (design doc §3.3).</summary>
 		public static double ZoneCenterLongitude(double lonDeg, double zoneWidthDeg)
 		{
 			double norm = NormalizeLon(lonDeg);
@@ -83,7 +79,7 @@ namespace SituationalAwareness.Core
 			return (int)Math.Round(norm / zoneWidthDeg);
 		}
 
-		/// <summary>Splits a [0,1) day fraction into local hh:mm:ss for N local hours per day.</summary>
+		/// <summary>Splits a day fraction into hh:mm:ss for N local hours per day.</summary>
 		public static void SplitLocalTime(double dayFraction01, int hoursPerDay, out int hh, out int mm, out int ss)
 		{
 			double totalHours = dayFraction01 * hoursPerDay;
@@ -127,11 +123,8 @@ namespace SituationalAwareness.Core
 			return SaPhaseSurface.Night;
 		}
 
-		/// <summary>
-		/// Solar elevation above the local horizon, degrees. Ported from
-		/// RealBattery's SolarElevationRad (zenith angle from up·sunDir),
-		/// with the same anti-noise snap near the horizon.
-		/// </summary>
+		/// <summary>Solar elevation above the local horizon: the zenith angle from
+		/// up·sunDir, with an anti-noise snap near the horizon.</summary>
 		public static double SolarElevationDeg(Vessel v, CelestialBody star)
 		{
 			Vector3d worldPos = v.GetWorldPos3D();
@@ -147,7 +140,7 @@ namespace SituationalAwareness.Core
 			return elevDeg;
 		}
 
-		/// <summary>Solar azimuth, degrees, 0 = north, from vessel.north/east (design doc §4.2, verified M0 §5).</summary>
+		/// <summary>Solar azimuth, degrees, 0 = north, from vessel.north/east (design doc §4.2).</summary>
 		public static double SolarAzimuthDeg(Vessel v, CelestialBody star)
 		{
 			Vector3d sunDir = (star.position - v.GetWorldPos3D()).normalized;
@@ -158,10 +151,9 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Distance from the vessel to the nearest terminator (design doc
-		/// §5.3, tidal-lock-on-star only): bidirectional, always the closer
-		/// of the two terminators (subsolar ± 90°), measured along the
-		/// parallel (R·cos(lat)·Δλ) — the distance a rover actually drives.
+		/// Distance from the vessel to the nearer of the two terminators (subsolar
+		/// ± 90°), measured along the parallel as R·cos(lat)·Δλ, which is the
+		/// distance a rover actually drives (design doc §5.3, star-lock only).
 		/// </summary>
 		public static void TerminatorDistance(CelestialBody body, double vesselLatDeg, double vesselLonDeg,
 			double subsolarLonDeg, out double distanceKm, out double distanceDeg, out bool toEast)
@@ -181,22 +173,14 @@ namespace SituationalAwareness.Core
 
 		/// <summary>
 		/// Mean-minus-true clock gap in seconds at the given UT (equation of
-		/// center, e^3 order). Moved here from the old HomeClockCalibration
-		/// (M3 point 6, go 2026-07-28) and generalized to any body — reused
-		/// live by the SOLAR TIME row's equation-of-time display, not just
-		/// MeanTimeCalibration's one-time offset.
+		/// center, e^3 order), used both by MeanTimeCalibration's one-time offset
+		/// and live by the SOLAR TIME row.
 		///
-		/// Generalization pitfall (caught before writing this): the
-		/// eccentricity term must come from the orbit AROUND THE STAR, not
-		/// from `body.orbit` directly — for a moon like Mun, `body.orbit` is
-		/// Mun's orbit around KERBIN, whose eccentricity has nothing to do
-		/// with the equation of time (that's governed by Kerbin's own
-		/// eccentricity around the Sun). <see cref="StarOrbitingAncestor"/>
-		/// walks the referenceBody chain up to whichever ancestor orbits
-		/// `star` directly, and its eccentricity is what's used here — for
-		/// Kerbin itself this is a no-op (already the star-orbiting body).
-		/// `solarDayLength` stays the LOCAL body's own value (its own
-		/// rotation), only the eccentricity/mean-anomaly term changes source.
+		/// The eccentricity term must come from the orbit AROUND THE STAR, which
+		/// is why <see cref="StarOrbitingAncestor"/> walks up the chain: on a moon,
+		/// body.orbit is the orbit around its planet, whose eccentricity has
+		/// nothing to do with the equation of time. solarDayLength stays the local
+		/// body's own value, since that is its own rotation.
 		/// </summary>
 		public static double EquationOfTimeSeconds(CelestialBody body, CelestialBody star, double ut, double solarDayLength)
 		{
@@ -215,13 +199,9 @@ namespace SituationalAwareness.Core
 		}
 
 		/// <summary>
-		/// Walks referenceBody from `body` up to the ancestor that orbits
-		/// `star` directly (reference equality — star is the same singleton
-		/// CelestialBody instance StarResolver already resolved, so this is
-		/// safe). Returns `body` itself if it already orbits the star (the
-		/// common case: the home body, or any planet), or null if the chain
-		/// never reaches it (shouldn't happen for a resolved star, but a
-		/// planet-pack edge case isn't worth crashing over).
+		/// Walks referenceBody from <paramref name="body"/> up to the ancestor that
+		/// orbits <paramref name="star"/> directly, returning the body itself when
+		/// it already does, or null if the chain never reaches the star.
 		/// </summary>
 		private static CelestialBody StarOrbitingAncestor(CelestialBody body, CelestialBody star)
 		{

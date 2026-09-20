@@ -7,28 +7,21 @@ using UnityEngine.UI;
 namespace SituationalAwareness.UI
 {
 	/// <summary>
-	/// Vector dial (design doc §6.2, three variants — surface arc / orbit
-	/// ring / tidal-lock horizon) and the progress timeline (§6.3). All
-	/// shapes are built once and toggled/repositioned per refresh — never
-	/// glyphs (lesson from KRAB's non-rendering ⟳, design doc §6.2).
+	/// Vector dial in three variants (surface arc, orbit ring, tidal-lock
+	/// horizon) plus the progress timeline, design doc §6.2/§6.3. Shapes are
+	/// built once and toggled or repositioned per refresh, and are always drawn
+	/// rather than set as glyphs a stock font may not have.
 	/// </summary>
 	internal static class SaDial
 	{
 		private const float Rad2Deg = 180f / Mathf.PI;
-		// Bumped from 24 (bug fix, test M2 retest): each segment is an
-		// independent quad with no miter join, so the stroke shows small
-		// gaps at every joint — visible as speckled dots where a
-		// differently-colored layer sits underneath (orbit ring's shadow
-		// band over the lit track). More/smaller segments shrink the gaps
-		// proportionally; cheap regardless, this is a tiny 2D UI mesh.
+		// High, because each segment is an independent quad and the join discs
+		// only hide so much: smaller segments shrink the remaining gaps, and this
+		// is a tiny 2D UI mesh either way.
 		private const int ArcSegments = 90;
-		// Hardcoded (2026-07-23, user request; scoped to the root Sun only
-		// 2026-07-24 — see SaReadout.BodyIsSun): the root star has no
-		// orbit-color of its own (it doesn't orbit anything, no sensible
-		// entry in PSystemManager.OrbitRendererDataCache for it) — not
-		// something a planet pack cfg can define either way, so a fixed
-		// gold tone stands in for it. A secondary star (e.g. Grannus) DOES
-		// orbit the root Sun for real and keeps its own configured color.
+		// The root star orbits nothing, so it has no configurable orbit colour of
+		// its own and a fixed gold tone stands in. A secondary star really does
+		// orbit the root Sun and keeps its own colour (see SaReadout.BodyIsSun).
 		private static readonly Color StarDiscColor = new Color(1f, 0.8f, 0.2f, 1f);
 		private static readonly List<Vector2> EmptyPoints = new List<Vector2>();
 
@@ -52,11 +45,9 @@ namespace SituationalAwareness.UI
 
 			public Text phaseLabel;
 			public Text subLabel;
-			// Parent of phaseLabel/subLabel (M3 point 6, go 2026-07-28) —
-			// exposed so SaWindow can attach a click-catcher over the whole
-			// area for the SOLAR TIME line's click-to-cycle, without SaDial
-			// itself needing to know about click handlers (SaWindow owns
-			// all click behavior, SaDial only builds visuals).
+			// Parent of phaseLabel/subLabel, exposed so SaWindow can stretch a
+			// click-catcher over the whole area: SaWindow owns all click
+			// behaviour, SaDial only builds visuals.
 			public Transform labelsArea;
 
 			// Timeline
@@ -68,10 +59,9 @@ namespace SituationalAwareness.UI
 		private static Vector2 SurfaceP(float svgX, float svgY) => new Vector2(svgX - 55f, 35f - svgY);
 
 		/// <summary>
-		/// Builds the dial only (dial column). The timeline is built
-		/// separately via BuildTimeline, called by the window AFTER the data
-		/// rows so it lands at the bottom of the data column, not the top
-		/// (design doc §6.3: timeline sits below the environment rows).
+		/// Builds the dial alone. The timeline is built separately by
+		/// BuildTimeline, which the window calls AFTER the data rows so it lands
+		/// at the bottom of the data column (design doc §6.3).
 		/// </summary>
 		public static Handle Build(Transform dialParent)
 		{
@@ -94,14 +84,11 @@ namespace SituationalAwareness.UI
 			// --- orbit ring ---
 			h.orbitGroup = SaUi.Go("Orbit", areaRect);
 			CenterRect(h.orbitGroup);
-			// Color set dynamically each refresh (UpdateOrbit) — default vs
-			// per-body map color depends on a settings toggle, so the Build-
-			// time color here is just a placeholder.
+			// Colour is set each refresh in UpdateOrbit, since default vs per-body
+			// map colour depends on a setting: this one is a placeholder.
 			h.orbitPlanet = NewDot(h.orbitGroup.transform, SaUi.OrbitPlanetDefault);
 			h.orbitPlanet.SetPosition(Vector2.zero, 14f);
-			// Lit/shadow bands (bug fix, test M2 fase 8: two similarly-dark
-			// grays were indistinguishable) — pale blue for lit, dark navy
-			// for shadow, white marker.
+			// Lit/shadow bands: pale blue lit, dark navy shadow, white marker.
 			h.orbitTrack = NewLine(h.orbitGroup.transform, SaUi.OrbitLit, 4f, false);
 			SetPoints(h.orbitTrack, ArcPoints(Vector2.zero, 30f, 0f, 360f));
 			h.orbitShadow = NewLine(h.orbitGroup.transform, SaUi.OrbitShadow, 4f, false);
@@ -115,8 +102,8 @@ namespace SituationalAwareness.UI
 			h.lockSun = NewDot(h.lockGroup.transform, SaUi.Amber);
 
 			GameObject labels = SaUi.Go("Labels", dialParent);
-			// Spacing bumped from 2f (user feedback 2026-07-19, fase 0/8:
-			// phase label and the sub-line below it read as visually fused).
+			// Enough spacing that the phase label and the sub-line below it do not
+			// read as one block.
 			SaUi.Vertical(labels, 0, 8f);
 			h.phaseLabel = SaUi.Label(labels.transform, "-", 12, SaUi.Text, TextAnchor.MiddleCenter);
 			h.subLabel = SaUi.Label(labels.transform, "-", 10, SaUi.TextDim, TextAnchor.MiddleCenter);
@@ -126,14 +113,10 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Mini-dial for the collapsed strip (design doc §6.7, mockup
-		/// B1/B2/B3 — implemented 2026-07-25). A simplified version of
-		/// <see cref="Handle"/>: only the elements that stay legible at
-		/// icon size survive — surface drops the progress fill and the
-		/// dashed horizon (just the track arc + sun dot), orbit drops the
-		/// central planet disc (just the ring, shadow arc, and marker).
-		/// One shared instance per window; only one of the three groups is
-		/// active at a time, same SetActive pattern as <see cref="Handle"/>.
+		/// Mini-dial for the collapsed strip (design doc §6.7): a <see cref="Handle"/>
+		/// reduced to what stays legible at icon size, so surface keeps only the
+		/// track arc and sun dot, and orbit drops the central planet disc. One
+		/// shared instance per window, one group active at a time.
 		/// </summary>
 		public class StripHandle
 		{
@@ -173,9 +156,8 @@ namespace SituationalAwareness.UI
 
 			h.orbitGroup = SaUi.Go("Orbit", areaRect);
 			CenterRect(h.orbitGroup);
-			// Same palette as the extended dial (bug fix 2026-07-25, test M3:
-			// first pass used generic UI colors instead of the orbit-specific
-			// ones) — pale blue lit / dark navy shadow / white marker.
+			// Same palette as the extended dial: pale blue lit, dark navy shadow,
+			// white marker.
 			h.orbitTrack = NewLine(h.orbitGroup.transform, SaUi.OrbitLit, 3f, false);
 			SetPoints(h.orbitTrack, ArcPoints(Vector2.zero, StripOrbitRadius, 0f, 360f));
 			h.orbitShadow = NewLine(h.orbitGroup.transform, SaUi.OrbitShadow, 3f, false);
@@ -194,7 +176,9 @@ namespace SituationalAwareness.UI
 			return h;
 		}
 
-		/// <summary>Same per-mode formulas as <see cref="Update"/>'s surface/orbit/tidal-lock branches, just at the strip's smaller radii — kept in sync by reusing the same SaReadout fields, not a separate re-derivation.</summary>
+		/// <summary>The same per-mode formulas as <see cref="Update"/>, at the
+		/// strip's smaller radii: the same SaReadout fields are reused rather than
+		/// re-derived, so the two views cannot disagree.</summary>
 		public static void UpdateStripIcon(StripHandle h, SaReadout r)
 		{
 			h.surfaceGroup.SetActive(r.Mode == SaMode.Surface);
@@ -205,12 +189,10 @@ namespace SituationalAwareness.UI
 			{
 				case SaMode.Surface:
 				{
-					// Stellar dive exception (retest 2026-07-28): no
-					// discrete sun position makes sense when the vessel is
-					// at/in the star itself — track ring turns danger red
-					// instead (same "surrounded by the star" signal as the
-					// extended dial's full red arc; the strip icon has no
-					// separate fill element to reuse).
+					// Stellar dive: no discrete sun position makes sense when the
+					// vessel is at or in the star itself, so the track ring turns
+					// danger red instead — the strip has no separate fill element
+					// to paint like the extended dial's full red arc.
 					if (r.BodyIsStar)
 					{
 						h.surfaceTrack.color = SaUi.Danger;
@@ -218,10 +200,9 @@ namespace SituationalAwareness.UI
 						break;
 					}
 					h.surfaceTrack.color = SaUi.PanelEdge;
-					// Near-pole exception (M3 point 5, go 2026-07-28): ring
-					// stays its normal neutral color (not hazardous), just
-					// no sun-position dot — same unreliable-longitude reason
-					// as the extended dial.
+					// Near the pole the ring keeps its neutral colour — nothing is
+					// hazardous here — and simply loses the sun dot, longitude
+					// being unreliable there.
 					if (r.NearPole)
 					{
 						h.surfaceSun.gameObject.SetActive(false);
@@ -265,21 +246,16 @@ namespace SituationalAwareness.UI
 			}
 		}
 
-		/// <summary>Builds the progress timeline (design doc §6.3) in its own parent — call after the data rows so it lands at the bottom.</summary>
+		/// <summary>Builds the progress timeline (design doc §6.3) in its own
+		/// parent; call after the data rows so it lands at the bottom.</summary>
 		public static void BuildTimeline(Handle h, Transform parent)
 		{
 			GameObject wrap = SaUi.Go("Timeline", parent);
 			VerticalLayoutGroup wrapGroup = SaUi.Vertical(wrap, 0, 2f);
-			// Left/right padding (bug fix, test M3 retest): the timeline
-			// sits directly in dataCol, which lost its own horizontal
-			// padding when it moved onto individual rows instead (M3
-			// restyling, so dividers could bleed to the true edges) — the
-			// timeline isn't a divider, it needs the same 12px indent as
-			// every other row (SaWindow.RowPadding), or it renders flush
-			// against both side edges of the window. Small top padding
-			// (further refinement, same retest): even after the L/R fix the
-			// track bar still hugged the divider above it more tightly than
-			// its own bottom margin — a few px nudges it down to match.
+			// The timeline sits directly in dataCol, which carries no horizontal
+			// padding of its own (dividers must bleed to the true edges), so it
+			// needs the same indent as every row or it renders flush against both
+			// window edges. The top padding keeps it off the divider above.
 			wrapGroup.padding = new RectOffset(12, 12, 4, 0);
 
 			RectTransform track = SaUi.Bordered("Track", wrap.transform, SaUi.Inset, SaUi.PanelEdge);
@@ -319,9 +295,7 @@ namespace SituationalAwareness.UI
 			h.orbitGroup.SetActive(r.Mode == SaMode.Orbit);
 			h.lockGroup.SetActive(r.Mode == SaMode.TidalLock);
 
-			// Uppercase (M3 restyling, mockup reconciliation) — single point
-			// of truth here rather than at each of the three call sites in
-			// SaWindow.BuildClockAndPhase.
+			// Uppercased here rather than at each of the three call sites.
 			h.phaseLabel.text = phaseText.ToUpperInvariant();
 			h.subLabel.text = subText;
 			h.timelineTickLeft.text = tickLeft;
@@ -344,28 +318,25 @@ namespace SituationalAwareness.UI
 
 		private static void UpdateSurface(Handle h, SaReadout r)
 		{
-			// Stellar dive exception (retest 2026-07-28): the vessel is
-			// AT/IN the star itself, there's no external light source to
-			// cast a day/night arc from. A full arc in danger red — not an
-			// empty one — communicates "surrounded by the star", the
-			// opposite of what an empty (night-style) arc would imply.
+			// Stellar dive: the vessel is at or in the star itself, with no
+			// external light source to cast a day/night arc from. A FULL arc in
+			// danger red says "surrounded by the star", where an empty one would
+			// read as night, the opposite.
 			if (r.BodyIsStar)
 			{
 				h.surfaceFill.color = SaUi.Danger;
 				SetPoints(h.surfaceFill, ArcPoints(new Vector2(0f, -25f), 45f, 180f, 0f));
 				h.surfaceSun.gameObject.SetActive(false);
-				// No day-progress cursor to place — there's no day cycle to
-				// track a position within (unlike surfaceSun, the day band
-				// itself is harmless/decorative left in its default spot).
+				// No cursor to place: there is no day cycle to track a position
+				// within. The day band itself is harmless left where it is.
 				h.timelineCursor.gameObject.SetActive(false);
 				SetTimeline(h, 0.25f, 0.75f, 0f);
 				return;
 			}
-			// Near-pole exception (M3 point 5, go 2026-07-28): NOT
-			// dangerous (unlike stellar dive) — empty arc, same as night,
-			// rather than a colored full one. DayProgress01 itself is
-			// derived from the same unstable longitude, so there's no
-			// trustworthy position to draw a cursor at either.
+			// Near the pole: not dangerous, unlike the stellar dive above, so an
+			// empty arc as at night rather than a coloured full one. DayProgress01
+			// comes from the same unstable longitude, leaving no trustworthy
+			// position for a cursor either.
 			if (r.NearPole)
 			{
 				h.surfaceFill.color = SaUi.Amber;
@@ -380,20 +351,15 @@ namespace SituationalAwareness.UI
 
 			double hourAngle = SolarMath.HourAngleDeg(r.DayProgress01);
 			bool isDay = Math.Abs(hourAngle) <= 90.0;
-			// Bug fix (test M2 retest): t was clamped to [0,1] without ever
-			// resetting after dusk, so the fill arc stayed visually "full"
-			// all through the night and only snapped empty at the
-			// hourAngle +180/-180 wraparound (midnight) instead of at dusk
-			// where the daylight arc actually ends.
+			// Zero outside daylight, not just clamped: a clamped value would keep
+			// the fill arc full all night and only empty it at the ±180 wrap
+			// (midnight) instead of at dusk, where the daylight arc really ends.
 			double t = isDay ? Mathf.Clamp01((float)((hourAngle + 90.0) / 180.0)) : 0.0;
 
-			// Bug fix (test M3 retest): a stray amber dot showed up at the
-			// dial's start (180°) at night — same root cause as the earlier
-			// orbit-shadow fix. At t=0 (night, or the exact sunrise instant)
-			// the arc spans 180..180, a single repeated point; the round-join
-			// discs (closing gaps on a real curve) painted a filled disc on
-			// top of it instead. Feed no points at all when there's no real
-			// arc to draw, same pattern as SaDial.UpdateOrbit's shadow arc.
+			// No points at all when there is no arc to draw: a degenerate
+			// 180..180 span is a single repeated point, and the round-join discs
+			// would pile up there as a stray dot. Same guard as UpdateOrbit's
+			// shadow arc.
 			if (isDay && t > 0.0)
 			{
 				SetPoints(h.surfaceFill, ArcPoints(new Vector2(0f, -25f), 45f, 180f, 180f - (float)t * 180f));
@@ -413,13 +379,9 @@ namespace SituationalAwareness.UI
 
 		private static void UpdateOrbit(Handle h, SaReadout r)
 		{
-			// Planet disc color (feature request, test M2 retest): default
-			// is a brighter neutral than before ("ancora molto dim"); opt-in
-			// setting swaps it for the body's real map/orbit-line color.
-			// No extra attenuation here (bug fix 2026-07-22): the color now
-			// comes from PSystemManager.OrbitRendererDataCache, which Kopernicus
-			// already stores at half the configured icon brightness — dimming
-			// it again on top made it too dark/muddy.
+			// Planet disc: a neutral default, or the body's real map colour behind
+			// an opt-in setting. No extra attenuation, since that colour is
+			// already stored at half the configured icon brightness.
 			h.orbitPlanet.color = SaParams.UseBodyMapColorForDial
 				? (r.BodyIsSun ? StarDiscColor : r.BodyMapColorRaw)
 				: SaUi.OrbitPlanetDefault;
@@ -427,13 +389,9 @@ namespace SituationalAwareness.UI
 			float thetaDeg = (float)(r.OrbitThetaNowRad * Rad2Deg);
 			float phiDeg = (float)(r.OrbitPhiRad * Rad2Deg);
 
-			// No shadow to draw when orbiting the star itself (bug fix
-			// 2026-07-24): phiRad collapses to exactly 0 there
-			// (OrbitIllumination.Status's own degenerate-vector guard), so
-			// the arc would span -90..-90 — every polyline point lands on
-			// the same spot, and the round-join discs (all superimposed)
-			// showed up as a lone stray dot. Below the threshold, feed no
-			// points at all instead of a zero-width arc.
+			// No shadow when orbiting the star itself: phiRad collapses to 0 there,
+			// and a zero-width arc would pile every join disc on one spot, drawing
+			// a stray dot. Feed no points at all instead.
 			if (phiDeg > 0.05f)
 			{
 				SetPoints(h.orbitShadow, ArcPoints(Vector2.zero, 30f, -90f - phiDeg, -90f + phiDeg));
@@ -457,9 +415,8 @@ namespace SituationalAwareness.UI
 			h.lockSun.SetPosition(new Vector2(0f, y), 5f);
 
 			// Bar position from the same hour angle that drives the phase
-			// classification (design doc §5.3): |hourAngle|/180, subsolar=0
-			// (day side), antisolar=1 — E/W side is shown separately by the
-			// TERMINATORE row, the bar only cares about distance from noon.
+			// classification (design doc §5.3): 0 at the subsolar point, 1 at the
+			// antisolar one. Which side is east is the terminator row's job.
 			float frac = Mathf.Clamp01((float)(Math.Abs(r.TidalLockHourAngleDeg) / 180.0));
 			SetTimeline(h, 0f, 0.5f, frac);
 		}
@@ -487,12 +444,10 @@ namespace SituationalAwareness.UI
 		}
 
 		/// <summary>
-		/// Explicitly sets all four RectTransform fields to "zero-size,
-		/// centered on the parent" (KRAB lesson, CLAUDE.md 2026-07-15: a
-		/// GameObject created via Go() defaults to Unity's implicit
-		/// anchorMin/anchorMax = bottom-left of the parent, not the center —
-		/// leaving even one of the four fields implicit breaks the local-
-		/// space math these hand-drawn dials rely on, silently).
+		/// Explicitly sets all four RectTransform fields to zero-size, centred on
+		/// the parent. Go() leaves Unity's implicit anchors at the parent's
+		/// bottom-left, and leaving even one field implicit silently breaks the
+		/// local-space math these hand-drawn dials rely on.
 		/// </summary>
 		private static void CenterRect(GameObject go)
 		{
