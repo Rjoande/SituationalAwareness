@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- SA now loads on installs without EVE volumetric clouds.
+- SA now loads on installs without EVE volumetric clouds. Thanks to forum user **dok_377** for reporting and testing.
 
 ## v0.2.3
 
