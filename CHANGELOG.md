@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.4
+
+### Fixed
+
+- SA now loads on installs without EVE volumetric clouds.
+
 ## v0.2.3
 
 ### Changed

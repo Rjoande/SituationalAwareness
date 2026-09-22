@@ -408,8 +408,10 @@ namespace SituationalAwareness.WeatherReport
 	/// </summary>
 	internal static class EveLayerInfo
 	{
-		private static readonly Dictionary<CloudsRaymarchedVolume, ParticleFieldConfig> Cache =
-			new Dictionary<CloudsRaymarchedVolume, ParticleFieldConfig>();
+		// CloudsRaymarchedVolume -> ParticleFieldConfig, typed as object on purpose:
+		// Mono resolves field types when the class loads, and this class must
+		// stay loadable on an install without EVE.
+		private static readonly Dictionary<object, object> Cache = new Dictionary<object, object>();
 
 		private static FieldInfo particleFieldField;
 		private static FieldInfo configNameField;
@@ -418,7 +420,7 @@ namespace SituationalAwareness.WeatherReport
 		internal static ParticleFieldConfig GetParticleFieldConfig(CloudsRaymarchedVolume layer)
 		{
 			if (layer == null) return null;
-			if (Cache.TryGetValue(layer, out ParticleFieldConfig cached)) return cached;
+			if (Cache.TryGetValue(layer, out object cached)) return cached as ParticleFieldConfig;
 
 			ParticleFieldConfig result = null;
 			try

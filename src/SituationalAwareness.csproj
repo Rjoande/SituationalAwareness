@@ -6,7 +6,7 @@
     <LangVersion>8.0</LangVersion>
     <AssemblyName>SituationalAwareness</AssemblyName>
     <RootNamespace>SituationalAwareness</RootNamespace>
-    <Version>0.2.3</Version>
+    <Version>0.2.4</Version>
     <DebugType>none</DebugType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <!-- KSP install the reference assemblies come from. Defaults to the game

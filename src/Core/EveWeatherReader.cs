@@ -104,8 +104,14 @@ namespace SituationalAwareness.Core
 	/// <summary>
 	/// The only class in SA that touches EVE types. Every entry point is called
 	/// exclusively after WeatherClassifier has confirmed the assemblies are
-	/// loaded, so on an install without EVE these methods are never JITted and the
-	/// missing reference never surfaces.
+	/// loaded, so on an install without EVE these method BODIES are never JITted
+	/// and the missing reference never surfaces.
+	///
+	/// That guard covers method bodies only. Loading the class itself (which Mono
+	/// does as soon as any caller of a static method here is compiled, gated or
+	/// not) resolves the types of every field, so NO field may be of an EVE
+	/// type: the caches below are keyed and valued on object and cast at use.
+	/// An EVE-typed field here breaks SaToolbarApp.Start on installs without EVE.
 	///
 	/// Two traps in EVE's API to keep in mind: the cloudType out-value is
 	/// normalised 0..1 rather than an index, and SampleCoverage keeps returning a
@@ -114,13 +120,11 @@ namespace SituationalAwareness.Core
 	/// </summary>
 	internal static class EveWeatherReader
 	{
-		private static readonly Dictionary<CloudsRaymarchedVolume, ParticleFieldConfig> ParticleFieldCache =
-			new Dictionary<CloudsRaymarchedVolume, ParticleFieldConfig>();
-		private static readonly Dictionary<CloudsRaymarchedVolume, bool> LightningCache =
-			new Dictionary<CloudsRaymarchedVolume, bool>();
-
-		private static readonly Dictionary<CloudsRaymarchedVolume, EveLayerWindow> WindowCache =
-			new Dictionary<CloudsRaymarchedVolume, EveLayerWindow>();
+		// Keys are CloudsRaymarchedVolume instances and ParticleFieldCache values
+		// are ParticleFieldConfig; typed as object on purpose (see class summary).
+		private static readonly Dictionary<object, object> ParticleFieldCache = new Dictionary<object, object>();
+		private static readonly Dictionary<object, bool> LightningCache = new Dictionary<object, bool>();
+		private static readonly Dictionary<object, EveLayerWindow> WindowCache = new Dictionary<object, EveLayerWindow>();
 
 		private static FieldInfo particleFieldField;
 		private static FieldInfo particleConfigNameField;
@@ -383,7 +387,7 @@ namespace SituationalAwareness.Core
 		/// </summary>
 		private static ParticleFieldConfig GetParticleFieldConfig(CloudsRaymarchedVolume layer)
 		{
-			if (ParticleFieldCache.TryGetValue(layer, out ParticleFieldConfig cached)) return cached;
+			if (ParticleFieldCache.TryGetValue(layer, out object cached)) return cached as ParticleFieldConfig;
 			ParticleFieldConfig result = null;
 			try
 			{
