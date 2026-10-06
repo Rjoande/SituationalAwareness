@@ -67,6 +67,12 @@ Requirements
 - Kerbal Space Program 1.12.5
 - ToolbarControl (https://github.com/linuxgurugamer/ToolbarControl)
 
+Recommended:
+
+- ModuleManager (https://github.com/sarbian/ModuleManager) - needed for the
+  optional per-body weather presentation and science-gate patches, and for the
+  MFD Extension page.
+
 Optional:
 
 - Environmental Visual Enhancements, volumetric clouds
@@ -76,9 +82,13 @@ Optional:
 Installation
 ------------
 
-Extract this archive's contents into your GameData folder, so you end up with
-GameData/SituationalAwareness/.... Make sure ToolbarControl is installed
-alongside it.
+The easiest way is CKAN (https://github.com/KSP-CKAN/CKAN): search for
+"Situational Awareness" and install it, ToolbarControl comes along
+automatically.
+
+Manually: extract this archive's contents into your GameData folder, so you
+end up with GameData/SituationalAwareness/.... Make sure ToolbarControl is
+installed alongside it.
 
 
 Weather Report

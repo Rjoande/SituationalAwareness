@@ -25,13 +25,19 @@ A Kerbal Space Program mod that adds an avionics-style telemetry panel: local ti
 - Kerbal Space Program 1.12.5
 - [ToolbarControl](https://github.com/linuxgurugamer/ToolbarControl)
 
+Recommended:
+
+- [ModuleManager](https://github.com/sarbian/ModuleManager) — needed for the optional per-body weather presentation and science-gate patches, and for the MFD Extension page.
+
 Optional:
 
 - [Environmental Visual Enhancements](https://github.com/LGhassen/EnvironmentalVisualEnhancements) (volumetric clouds) — enables the weather section. Everything else works without it.
 
 ## Installation
 
-Copy the contents of this repository into your `GameData` folder, so you end up with `GameData/SituationalAwareness/...`.
+The easiest way is [CKAN](https://github.com/KSP-CKAN/CKAN): search for *Situational Awareness* and install it, ToolbarControl comes along automatically.
+
+Manually: copy the `GameData/SituationalAwareness` folder of a release into your game's `GameData` folder, so you end up with `GameData/SituationalAwareness/...`.
 Make sure ToolbarControl is installed alongside it.
 
 ## Weather Report
