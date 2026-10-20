@@ -12,8 +12,7 @@ tags:
 resources:
   homepage: https://forum.kerbalspaceprogram.com/topic/231631-1125-situational-awareness-avionics-style-telemetry-panel/
 depends:
-  - name: ToolbarController
-recommends:
   - name: ModuleManager
+  - name: ToolbarController
 suggests:
   - name: EnvironmentalVisualEnhancements
