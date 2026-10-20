@@ -24,10 +24,7 @@ A Kerbal Space Program mod that adds an avionics-style telemetry panel: local ti
 
 - Kerbal Space Program 1.12.5
 - [ToolbarControl](https://github.com/linuxgurugamer/ToolbarControl)
-
-Recommended:
-
-- [ModuleManager](https://github.com/sarbian/ModuleManager) — needed for the optional per-body weather presentation and science-gate patches, and for the MFD Extension page.
+- [ModuleManager](https://github.com/sarbian/ModuleManager)
 
 Optional:
 

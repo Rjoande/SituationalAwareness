@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.5
+
+### Added
+
+- Packaging for [CKAN](https://github.com/KSP-CKAN/CKAN): the release now includes a KSP-AVC `.version` file (KSP 1.12.0–1.12.5), and the README explains how to install through CKAN. No code changes: the plugins are the same as in v0.2.4.
+
 ## v0.2.4
 
 ### Fixed
